@@ -12,16 +12,14 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.pointerMoveFilter
-import androidx.compose.ui.layout.HorizontalAlignmentLine
 import androidx.compose.ui.unit.dp
+import java.io.File
 import kotlin.random.Random
 
 // Preview function to preview the app's UI in the IDE
@@ -41,6 +39,8 @@ fun FastFinderApp() {
     var filterText by remember { mutableStateOf("Filter") } // Filter text (Files, Folders, All)
     val themeElements =  ThemeElements() // Instance of the data class where the UI theme elements are saved
     val lazyListState = rememberLazyListState() // LazyListState to manage the scroll state of LazyColumn
+    var searchMode = SearchMode.ALL
+    val customDir = File("D:\\Daniel")  // The directory to search in when testing
 
 
     // Material theme for styling UI components
@@ -74,7 +74,7 @@ fun FastFinderApp() {
                         .onKeyEvent { event -> // Starts the search if the "Enter" button is pressed
                             // Handle Enter key
                             if (event.type == KeyEventType.KeyUp && event.key == Key.Enter) {
-                                testList = testList + SystemItem(itemPath = "Test/Daniel/Pino/", itemName = searchValue, isFile = Random.nextBoolean())
+                                testList = testList + (Search(searchValue = searchValue, searchMode = searchMode, customRootDirectory = customDir).startSearch())
                                 searchValue = "" // Clear search after adding
                                 true // Indicate event was handled
                             } else {
@@ -88,7 +88,7 @@ fun FastFinderApp() {
 
                     Button(
                         onClick = {
-                            testList = testList + SystemItem(itemPath = "Test/Daniel/Pino/", itemName = searchValue, isFile = Random.nextBoolean())
+                            testList = testList + (Search(searchValue = searchValue, searchMode = searchMode, customRootDirectory = customDir).startSearch())
                             searchValue = ""
                         },
                         colors = ButtonDefaults.buttonColors(
@@ -133,6 +133,7 @@ fun FastFinderApp() {
                         DropdownMenuItem(
                             onClick = {
                                 filterText = "Files"
+                                searchMode = SearchMode.FILES
                                 isExpanded = false
                             }
                         ) {
@@ -142,6 +143,7 @@ fun FastFinderApp() {
                         DropdownMenuItem(
                             onClick = {
                                 filterText = "Folders"
+                                searchMode = SearchMode.DIRECTORIES
                                 isExpanded = false
                             }
                         ) {
@@ -151,6 +153,7 @@ fun FastFinderApp() {
                         DropdownMenuItem(
                             onClick = {
                                 filterText = "All"
+                                searchMode = SearchMode.ALL
                                 isExpanded = false
 
                             }
@@ -186,7 +189,7 @@ fun FastFinderApp() {
                         ) {
                         items(testList) {
                             item ->
-                            TextElements(item)
+                            LazyListItem(item)
 
 
                         }
@@ -206,58 +209,3 @@ fun FastFinderApp() {
     }
 }
 
-// Displays each item in the list with hover effect
-@Composable
-fun TextElements(item: SystemItem) {
-
-
-    var isHovered by remember { mutableStateOf(false) } // State to track hover
-
-    // Determine icon for file or folder
-    val icon: ImageVector = if (item.isFile) {
-        ThemeElements().fileIcon
-    } else {
-        ThemeElements().folderIcon
-    }
-
-    Row(modifier = Modifier.pointerInput(Unit) {
-        // Detect hover using PointerEventType
-        awaitPointerEventScope {
-            while (true) {
-                val event = awaitPointerEvent()
-                when (event.type) {
-                    PointerEventType.Enter -> isHovered = true
-                    PointerEventType.Exit -> isHovered = false
-                }
-            }
-        }
-    }
-        .background(color = if (isHovered) Color.LightGray else ThemeElements().lazyColumnColor) // Highlights the row if it is being hovered
-        .padding(8.dp)) {
-
-        Icon(
-            icon,
-            contentDescription = null,
-            modifier = Modifier.padding(8.dp)
-        )
-
-        Text(
-            text = item.itemPath + item.itemName,
-            modifier = Modifier.padding(8.dp).weight(1f)
-        )
-
-
-        if (isHovered) { // Displays the clickable icon if it is hovered
-            // If clicked opens the location of the file or the folder
-            Icon(
-                ThemeElements().openFolderIcon,
-                contentDescription = null,
-                modifier = Modifier
-                    .padding(8.dp)
-                    .clickable {
-                        //TODO
-                    }
-            )
-        }
-    }
-}

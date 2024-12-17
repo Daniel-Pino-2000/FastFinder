@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import java.io.File
 
 // Main entry point of the application
 fun main() = application {
@@ -33,3 +34,5 @@ fun main() = application {
         FastFinderApp()
     }
 }
+
+
