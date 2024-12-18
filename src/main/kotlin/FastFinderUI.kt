@@ -20,6 +20,7 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import java.io.File
+import java.sql.Time
 import kotlin.random.Random
 
 // Preview function to preview the app's UI in the IDE
@@ -40,7 +41,10 @@ fun FastFinderApp() {
     val themeElements =  ThemeElements() // Instance of the data class where the UI theme elements are saved
     val lazyListState = rememberLazyListState() // LazyListState to manage the scroll state of LazyColumn
     var searchMode = SearchMode.ALL
-    val customDir = File("D:\\Daniel")  // The directory to search in when testing
+    val customDir = File("D:\\Documentos")  // The directory to search in when testing
+    var startTime : Long // Variable used to record the start time
+    var endTime : Long // Variable used to record the end time
+    var elapsedTime = 0.0 // Calculate elapsed time in seconds
 
 
     // Material theme for styling UI components
@@ -74,8 +78,12 @@ fun FastFinderApp() {
                         .onKeyEvent { event -> // Starts the search if the "Enter" button is pressed
                             // Handle Enter key
                             if (event.type == KeyEventType.KeyUp && event.key == Key.Enter) {
+                                startTime = System.nanoTime()
                                 testList = testList + (Search(searchValue = searchValue, searchMode = searchMode, customRootDirectory = customDir).startSearch())
                                 searchValue = "" // Clear search after adding
+                                endTime = System.nanoTime()
+                                // Calculate elapsed time in seconds
+                                elapsedTime = (endTime - startTime) / 1_000_000_000.0
                                 true // Indicate event was handled
                             } else {
                                 false
@@ -88,8 +96,12 @@ fun FastFinderApp() {
 
                     Button(
                         onClick = {
+                            startTime = System.nanoTime()
                             testList = testList + (Search(searchValue = searchValue, searchMode = searchMode, customRootDirectory = customDir).startSearch())
                             searchValue = ""
+                            endTime = System.nanoTime()
+                            // Calculate elapsed time in seconds
+                            elapsedTime = (endTime - startTime) / 1_000_000_000.0
                         },
                         colors = ButtonDefaults.buttonColors(
                             backgroundColor = themeElements.buttonColor,
@@ -164,6 +176,8 @@ fun FastFinderApp() {
                     }
                 }
 
+                Text("$elapsedTime")
+
 
 
             }
@@ -208,4 +222,5 @@ fun FastFinderApp() {
         }
     }
 }
+
 
