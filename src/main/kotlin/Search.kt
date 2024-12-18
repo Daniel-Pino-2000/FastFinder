@@ -1,4 +1,6 @@
 import java.io.File
+import kotlinx.coroutines.*
+import java.util.Collections
 
 // Enum class representing the different search modes: FILES, DIRECTORIES, and ALL
 enum class SearchMode {
@@ -25,25 +27,31 @@ class Search(
      * @return A list of SystemItem objects that match the search criteria.
      */
     fun startSearch(): List<SystemItem> {
-        val foundItems = mutableListOf<SystemItem>() // List to store the found files and directories
+        val foundItems = Collections.synchronizedList(mutableListOf<SystemItem>()) // Thread-safe list
 
         // Ensure we only proceed if rootDirectories is not null or empty
         val validRootDirs = rootDirectories?.takeIf { it.isNotEmpty() } ?: return emptyList()
 
-        // Walk through each root directory and filter based on the search mode
-        for (rootDir in validRootDirs) {
-            rootDir.walkTopDown() // Traverse the directory and its subdirectories
-                .filter { file ->
-                    when (searchMode) {
-                        SearchMode.FILES -> file.isFile && file.name.equals(searchValue, ignoreCase = true) // Match files by name
-                        SearchMode.DIRECTORIES -> file.isDirectory && file.name.equals(searchValue, ignoreCase = true) // Match directories by name
-                        SearchMode.ALL -> file.name.equals(searchValue, ignoreCase = true) // Match both files and directories by name
-                    }
+        // Precompute the filter logic based on the search mode
+        val filter: (File) -> Boolean = when (searchMode) {
+            SearchMode.FILES -> { file -> file.isFile && file.name.equals(searchValue, ignoreCase = true) }
+            SearchMode.DIRECTORIES -> { file -> file.isDirectory && file.name.equals(searchValue, ignoreCase = true) }
+            SearchMode.ALL -> { file -> file.name.equals(searchValue, ignoreCase = true) }
+        }
+
+        // Use coroutines for parallel traversal of root directories
+        runBlocking {
+            validRootDirs.map { rootDir ->
+                async(Dispatchers.IO) { // Launch each directory traversal in its own coroutine
+                    rootDir.walkTopDown() // Traverse the rootDir and its subdirectories
+                        .filter(filter) // Use the precomputed filter
+                        .forEach { file ->
+                            foundItems.add(
+                                SystemItem(itemName = file.name, itemPath = file.path, isFile = file.isFile)
+                            )
+                        }
                 }
-                .forEach {
-                    // Add matching files or directories to the list
-                    foundItems.add(SystemItem(itemName = it.name, itemPath = it.path, isFile = it.isFile))
-                }
+            }.awaitAll() // Wait for all coroutines to complete
         }
 
         return foundItems // Return the list of found items
