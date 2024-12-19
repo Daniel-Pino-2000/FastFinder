@@ -41,7 +41,7 @@ fun FastFinderApp() {
     val themeElements =  ThemeElements() // Instance of the data class where the UI theme elements are saved
     val lazyListState = rememberLazyListState() // LazyListState to manage the scroll state of LazyColumn
     var searchMode = SearchMode.ALL
-    val customDir = File("D:\\Documentos")  // The directory to search in when testing
+    val customDir = File("D:\\")  // The directory to search in when testing
     var startTime : Long // Variable used to record the start time
     var endTime : Long // Variable used to record the end time
     var elapsedTime = 0.0 // Calculate elapsed time in seconds
@@ -79,7 +79,8 @@ fun FastFinderApp() {
                             // Handle Enter key
                             if (event.type == KeyEventType.KeyUp && event.key == Key.Enter) {
                                 startTime = System.nanoTime()
-                                testList = testList + (Search(searchValue = searchValue, searchMode = searchMode, customRootDirectory = customDir).startSearch())
+                                testList = emptyList()
+                                testList = testList + (Search(searchValue = searchValue, searchMode = searchMode).startSearch())
                                 searchValue = "" // Clear search after adding
                                 endTime = System.nanoTime()
                                 // Calculate elapsed time in seconds
@@ -97,6 +98,7 @@ fun FastFinderApp() {
                     Button(
                         onClick = {
                             startTime = System.nanoTime()
+                            testList = emptyList()
                             testList = testList + (Search(searchValue = searchValue, searchMode = searchMode, customRootDirectory = customDir).startSearch())
                             searchValue = ""
                             endTime = System.nanoTime()

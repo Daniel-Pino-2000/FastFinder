@@ -1,11 +1,13 @@
 import java.io.File
 import kotlinx.coroutines.*
+import java.io.IOException
 import java.nio.file.FileVisitResult
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.SimpleFileVisitor
 import java.nio.file.attribute.BasicFileAttributes
 import java.util.Collections
+import java.nio.file.AccessDeniedException
 
 // Enum class representing the different search modes: FILES, DIRECTORIES, and ALL
 enum class SearchMode {
@@ -20,7 +22,6 @@ class Search(
     var searchValue: String,     // The name of the file or directory to search for
     var searchMode: SearchMode,   // The mode of the search (FILES, DIRECTORIES, ALL)
     var customRootDirectory: File? = null  // Optional parameter for custom root directory
-
 ) {
     // Use the custom root directory if provided, otherwise fall back to the default root directories
     val rootDirectories: Array<File>? = customRootDirectory?.let { arrayOf(it) } ?: fetchRootDirectories()
@@ -48,71 +49,75 @@ class Search(
      *         If no items match the criteria or if no root directories are found, an empty list is returned.
      */
     fun startSearch(): List<SystemItem> {
-        // Create a thread-safe list to hold the found items
+        // Thread-safe list to store the found items
         val foundItems = Collections.synchronizedList(mutableListOf<SystemItem>())
 
         // Ensure we only proceed if rootDirectories is not null or empty
-        // If rootDirectories is null or empty, return an empty list
         val validRootDirs = rootDirectories?.takeIf { it.isNotEmpty() } ?: return emptyList()
 
         // Start a coroutine scope using runBlocking
-        // runBlocking is used to wait for all asynchronous tasks to finish
         runBlocking {
-            // Iterate over each valid root directory asynchronously
             validRootDirs.map { rootDir ->
-                // Launch a new coroutine for each directory traversal task
                 async(Dispatchers.IO) {
                     // Start walking the file tree for each root directory
                     Files.walkFileTree(rootDir.toPath(), object : SimpleFileVisitor<Path>() {
 
+                        // Determine the search criteria once before traversal
+                        val checkForFiles = searchMode == SearchMode.FILES || searchMode == SearchMode.ALL
+                        val checkForDirs = searchMode == SearchMode.DIRECTORIES || searchMode == SearchMode.ALL
+
                         // Override visitFile to handle each file encountered during traversal
                         override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
-                            // Extract the file name from the Path object
-                            val fileName = file.fileName.toString()
-
-                            // Check if searchMode is FILES and the file name matches searchValue
-                            if (searchMode == SearchMode.FILES && fileName.equals(searchValue, ignoreCase = true)) {
-                                // Add the file to foundItems if it matches
-                                foundItems.add(
-                                    SystemItem(itemName = fileName, itemPath = file.toString(), isFile = true)
-                                )
+                            try {
+                                val fileName = file.fileName?.toString() // Safe call to prevent NPE
+                                // Only check files if searchMode is FILES or ALL, and file name contains search value
+                                if (fileName != null && checkForFiles && fileName.contains(searchValue, ignoreCase = true)) {
+                                    foundItems.add(
+                                        SystemItem(itemName = fileName, itemPath = file.toString(), isFile = true)
+                                    )
+                                } else if (fileName == null) {
+                                    // Log any file with a null name (for debugging purposes)
+                                    println("Skipping file with null name: ${file.toString()}")
+                                }
+                            } catch (e: AccessDeniedException) {
+                                println("Access denied to file: ${file.toString()}")
                             }
-
-                            // Check if searchMode is ALL and the file name matches searchValue
-                            if (searchMode == SearchMode.ALL && fileName.equals(searchValue, ignoreCase = true)) {
-                                // Add the file to foundItems if it matches in ALL mode
-                                foundItems.add(
-                                    SystemItem(itemName = fileName, itemPath = file.toString(), isFile = true)
-                                )
-                            }
-
-                            // Continue to the next file in the directory
-                            return FileVisitResult.CONTINUE
+                            return FileVisitResult.CONTINUE // Continue to the next file
                         }
 
                         // Override preVisitDirectory to handle each directory encountered during traversal
                         override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
-                            // Extract the directory name from the Path object
-                            val dirName = dir.fileName.toString()
-
-                            // Check if searchMode is DIRECTORIES and the directory name matches searchValue
-                            if (searchMode == SearchMode.DIRECTORIES && dirName.equals(searchValue, ignoreCase = true)) {
-                                // Add the directory to foundItems if it matches
-                                foundItems.add(
-                                    SystemItem(itemName = dirName, itemPath = dir.toString(), isFile = false)
-                                )
+                            try {
+                                val dirName = dir.fileName?.toString() // Safe call to prevent NPE
+                                // Only check directories if searchMode is DIRECTORIES or ALL, and dir name contains search value
+                                if (dirName != null && checkForDirs && dirName.contains(searchValue, ignoreCase = true)) {
+                                    foundItems.add(
+                                        SystemItem(itemName = dirName, itemPath = dir.toString(), isFile = false)
+                                    )
+                                } else if (dirName == null) {
+                                    // Log any directory with a null name (for debugging purposes)
+                                    println("Skipping directory with null name: ${dir.toString()}")
+                                }
+                                // Skip protected system directories like Windows, Program Files, and others
+                                if (dirName == "\$RECYCLE.BIN" || dirName.equals("Windows", ignoreCase = true) ||
+                                    dirName.equals("Program Files", ignoreCase = true) || dirName.equals("Program Files (x86)", ignoreCase = true)) {
+                                    println("Skipping protected system directory: ${dir.toString()}")
+                                    return FileVisitResult.SKIP_SUBTREE // Skip this directory and its contents
+                                }
+                            } catch (e: AccessDeniedException) {
+                                println("Access denied to directory: ${dir.toString()}")
+                                return FileVisitResult.SKIP_SUBTREE // Skip this directory and its contents
                             }
+                            return FileVisitResult.CONTINUE // Continue to the next directory
+                        }
 
-                            // Check if searchMode is ALL and the directory name matches searchValue
-                            if (searchMode == SearchMode.ALL && dirName.equals(searchValue, ignoreCase = true)) {
-                                // Add the directory to foundItems if it matches in ALL mode
-                                foundItems.add(
-                                    SystemItem(itemName = dirName, itemPath = dir.toString(), isFile = false)
-                                )
+                        // Catch and handle AccessDeniedException to prevent crash on protected directories
+                        override fun visitFileFailed(file: Path, exc: IOException): FileVisitResult {
+                            if (exc is AccessDeniedException) {
+                                println("Access denied to: ${file.toString()}")
+                                return FileVisitResult.CONTINUE // Skip this file and continue
                             }
-
-                            // Continue to the contents of the directory
-                            return FileVisitResult.CONTINUE
+                            return super.visitFileFailed(file, exc)
                         }
                     })
                 }
@@ -123,9 +128,6 @@ class Search(
         return foundItems
     }
 
-
-
-
     /**
      * Returns the list of root directories available in the system's file storage.
      *
@@ -133,9 +135,12 @@ class Search(
      */
     fun fetchRootDirectories(): Array<File>? {
         val roots = File.listRoots() // Get all root directories
+
         return if (roots.isNotEmpty()) {
+            println("Root directories found.")
             roots // Return the list of root directories
         } else {
+            println("No root directories found.")
             null // Return null if no root directories are found
         }
     }
