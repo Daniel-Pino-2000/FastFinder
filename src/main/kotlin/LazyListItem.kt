@@ -11,11 +11,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import java.awt.Desktop
+import java.io.File
+import java.net.URI
 
 // Displays each item in the list with hover effect
 @Composable
 fun LazyListItem(item: SystemItem) {
-
 
     var isHovered by remember { mutableStateOf(false) } // State to track hover
 
@@ -52,16 +54,19 @@ fun LazyListItem(item: SystemItem) {
             modifier = Modifier.padding(8.dp).weight(1f)
         )
 
-
         if (isHovered) { // Displays the clickable icon if it is hovered
-            // If clicked opens the location of the file or the folder
+            // If clicked, open the location of the file or the folder
             Icon(
                 ThemeElements().openFolderIcon,
                 contentDescription = null,
                 modifier = Modifier
                     .padding(8.dp)
                     .clickable {
-                        //TODO
+                        // Ensure item.itemPath is a valid path, then open in file explorer
+                        val file = File(item.itemPath)
+                        if (file.exists()) {
+                            Desktop.getDesktop().browse(file.toURI())  // Opens the location in file explorer
+                        }
                     }
             )
         }

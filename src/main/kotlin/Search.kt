@@ -64,14 +64,14 @@ class Search(
                                 localFoundItems.add(SystemItem(dirName, dir.toString(), isFile = false))
                             }
 
-                            /*
+
                             // Skip protected system directories
                             if (dirName == "\$RECYCLE.BIN" || dirName.equals("Windows", ignoreCase = true) ||
                                 dirName.equals("Program Files", ignoreCase = true) || dirName.equals("Program Files (x86)", ignoreCase = true)) {
                                 return FileVisitResult.SKIP_SUBTREE
                             }
 
-                             */
+
 
                         } catch (e: AccessDeniedException) {
                             println("Access denied to directory: ${dir.toString()}")
