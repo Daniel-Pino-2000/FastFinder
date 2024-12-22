@@ -22,7 +22,13 @@ dependencies {
     // With compose.desktop.common you will also lose @Preview functionality
     implementation(compose.desktop.currentOs)
     implementation(compose.materialIconsExtended)
+
+    // Add Lucene dependency with version 7.1.0
+    implementation("org.apache.lucene:lucene-core:7.1.0")  // core Lucene library
+    implementation("org.apache.lucene:lucene-analyzers-common:7.1.0")  // for standard analyzers
+    implementation("org.apache.lucene:lucene-queryparser:7.1.0")  // for query parsing
 }
+
 
 compose.desktop {
     application {
