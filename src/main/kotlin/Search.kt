@@ -177,11 +177,11 @@ class Search(
         // Create a valid Lucene query without leading wildcards
         val searchTerm = searchValue.trim().lowercase()
         val queryStr = """
-            name:$searchTerm* OR
-            nameOriginal:$searchTerm* OR
-            name:$searchTerm OR
-            nameOriginal:$searchTerm
-        """.trimIndent().replace("\n", " ")
+        name:$searchTerm* OR
+        nameOriginal:$searchTerm* OR
+        name:$searchTerm OR
+        nameOriginal:$searchTerm
+    """.trimIndent().replace("\n", " ")
 
         println("Query: $queryStr")
 
@@ -206,7 +206,19 @@ class Search(
                 val isFile = doc.get("isFile").toBoolean()
 
                 if (itemName != null && itemPath != null) {
-                    foundItems.add(SystemItem(itemName, itemPath, isFile))
+                    // Filter based on search mode
+                    when (searchMode) {
+                        SearchMode.FILES -> {
+                            if (isFile) foundItems.add(SystemItem(itemName, itemPath, isFile))
+                        }
+                        SearchMode.DIRECTORIES -> {
+                            if (!isFile) foundItems.add(SystemItem(itemName, itemPath, isFile))
+                        }
+                        SearchMode.ALL -> {
+                            foundItems.add(SystemItem(itemName, itemPath, isFile))
+                        }
+                    }
+
                     println("Match found: $itemName at $itemPath")
                 }
             }
@@ -214,4 +226,5 @@ class Search(
             return foundItems
         }
     }
+
 }
