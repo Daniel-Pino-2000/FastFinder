@@ -15,41 +15,48 @@ import java.io.IOException
 import java.nio.file.*
 import java.nio.file.attribute.BasicFileAttributes
 
-// Define the SearchMode enum for file/directory search modes
 enum class SearchMode {
-    FILES, DIRECTORIES, ALL
+    FILES,
+    DIRECTORIES,
+    ALL
 }
 
-
-// Search class that will handle both indexing and searching
 class Search(
-    private val searchValue: String, // Value to search in the index
-    private val searchMode: SearchMode, // Mode to determine whether to search files, directories, or both
-    private val customRootDirectory: File? // The root directory to start indexing
+    val searchValue: String,
+    val searchMode: SearchMode,
+    val customRootDirectory: File?
 ) {
     private val analyzer = StandardAnalyzer()
-    private val indexDirectory: Directory = RAMDirectory() // In-memory index
-    private val skippedPaths = mutableListOf<String>() // Track skipped paths
+    private val indexDirectory: Directory = RAMDirectory()
+    val skippedPaths = mutableListOf<String>()
+    private var totalIndexed = 0
 
-    // Method to index files and directories and then perform the search
     fun indexAndSearch(): List<SystemItem> {
         return try {
-            // Explicitly define the type to ensure it returns List<SystemItem>
-            val items: List<SystemItem> = indexFilesAndDirectories()
-            items  // Return the list of SystemItem objects directly
+            println("Starting search for '$searchValue' in mode: $searchMode")
+            println("Root directory: ${customRootDirectory?.absolutePath ?: System.getProperty("user.dir")}")
+
+            val indexWriterConfig = IndexWriterConfig(analyzer)
+            IndexWriter(indexDirectory, indexWriterConfig).use { writer ->
+                indexFilesAndDirectories(writer)
+                writer.commit()
+                println("\nIndexing completed. Total items indexed: $totalIndexed")
+            }
+
+            val results = searchIndex()
+            println("Search completed. Found ${results.size} results")
+            results
         } catch (e: Exception) {
-            // In case of an error, add to skippedPaths and return an empty list
+            println("Error during search: ${e.message}")
+            e.printStackTrace()
             skippedPaths.add("Error: ${e.message}")
-            emptyList()  // Return an empty list when there is an exception
+            emptyList()
         }
     }
 
-    // Index files and directories by walking through the file tree
-    private fun indexFilesAndDirectories(): List<SystemItem> {
-        val indexWriterConfig = IndexWriterConfig(analyzer)
-        val indexWriter = IndexWriter(indexDirectory, indexWriterConfig)
-
+    private fun indexFilesAndDirectories(indexWriter: IndexWriter) {
         val rootPath = customRootDirectory?.toPath() ?: Paths.get(System.getProperty("user.dir"))
+        println("Walking directory tree from: ${rootPath.toAbsolutePath()}")
 
         Files.walkFileTree(rootPath, object : SimpleFileVisitor<Path>() {
             override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
@@ -90,69 +97,87 @@ class Search(
                 return FileVisitResult.CONTINUE
             }
         })
-
-        // Ensure we return the list of items from searchIndex
-        return searchIndex()  // This method should return a list of SystemItem
     }
 
-    // Add a file or directory to the Lucene index
     private fun addToIndex(path: Path, indexWriter: IndexWriter, isFile: Boolean) {
         val document = Document()
 
-        // Extract file name and add to index
-        val fileName = path.fileName?.toString()?.lowercase() ?: return
-        document.add(TextField("name", fileName, Field.Store.YES)) // Store file name
-        document.add(StringField("path", path.toString(), Field.Store.YES)) // Store path
-        document.add(StringField("isFile", isFile.toString(), Field.Store.YES)) // Store if it's a file
+        val fullFileName = path.fileName?.toString() ?: return
 
-        indexWriter.addDocument(document) // Add document to index
-        println("Indexed: $fileName")
+        // Store both original and lowercase versions
+        document.add(TextField("nameOriginal", fullFileName, Field.Store.YES))
+        document.add(TextField("name", fullFileName.lowercase(), Field.Store.YES))
+
+        // Store the parent path for context
+        val parentPath = path.parent?.toString() ?: ""
+        document.add(StringField("parent", parentPath, Field.Store.YES))
+
+        // Store the full absolute path
+        document.add(StringField("path", path.toAbsolutePath().toString(), Field.Store.YES))
+        document.add(StringField("isFile", isFile.toString(), Field.Store.YES))
+
+        indexWriter.addDocument(document)
+        totalIndexed++
+
+        if (totalIndexed % 1000 == 0) {
+            println("Indexed $totalIndexed items...")
+        }
     }
 
-    // Check if a directory is restricted (e.g., Windows system directories)
     private fun isRestrictedDirectory(path: Path): Boolean {
         val restrictedDirs = setOf(
             "\$Recycle.Bin",
             "Windows",
             "Program Files",
-            "Archivos de programa", // Spanish Windows
             "Program Files (x86)",
-            "Archivos de programa (x86)", // Spanish Windows
-            "System Volume Information",
-            "Documents and Settings",
-            "ProgramData",
-            "\$Windows.~WS"
+            "System Volume Information"
         )
 
         val pathStr = path.toString().lowercase()
-        return restrictedDirs.any { restricted ->
-            pathStr.contains(restricted.lowercase())
-        }
+        return restrictedDirs.any { restricted -> pathStr.contains(restricted.lowercase()) }
     }
 
-    // Search the index for files or directories matching the search value
     private fun searchIndex(): List<SystemItem> {
-        val queryParser = QueryParser("name", analyzer)  // Parse query based on "name" field
-        val query = queryParser.parse("$searchValue*")  // Use wildcard for partial matching
+        println("\nExecuting search with value: '$searchValue'")
 
-        val indexReader = DirectoryReader.open(indexDirectory)
-        val indexSearcher = IndexSearcher(indexReader)
+        // Create a valid Lucene query without leading wildcards
+        val searchTerm = searchValue.trim().lowercase()
+        val queryStr = """
+            name:$searchTerm* OR
+            nameOriginal:$searchTerm* OR
+            name:$searchTerm OR
+            nameOriginal:$searchTerm
+        """.trimIndent().replace("\n", " ")
 
-        val topDocs = indexSearcher.search(query, 100)
-        val foundItems = mutableListOf<SystemItem>()
+        println("Query: $queryStr")
 
-        for (scoreDoc in topDocs.scoreDocs) {
-            val doc = indexSearcher.doc(scoreDoc.doc)
-            val itemName = doc.get("name") ?: ""
-            val itemPath = doc.get("path") ?: ""
-            val isFile = doc.get("isFile").toBoolean()
+        val queryParser = QueryParser("name", analyzer)
+        // Set to allow leading wildcards if needed (though we're not using them in this query)
+        queryParser.allowLeadingWildcard = false
+        val query = queryParser.parse(queryStr)
 
-            if (itemName.contains(searchValue, ignoreCase = true)) {
-                foundItems.add(SystemItem(itemName, itemPath, isFile))
+        DirectoryReader.open(indexDirectory).use { reader ->
+            println("Index contains ${reader.numDocs()} documents")
+
+            val searcher = IndexSearcher(reader)
+            val topDocs = searcher.search(query, Integer.MAX_VALUE)  // No limit on results
+            println("Found ${topDocs.totalHits} matching documents")
+
+            val foundItems = mutableListOf<SystemItem>()
+
+            for (scoreDoc in topDocs.scoreDocs) {
+                val doc = searcher.doc(scoreDoc.doc)
+                val itemName = doc.get("nameOriginal") // Use original name for display
+                val itemPath = doc.get("path")
+                val isFile = doc.get("isFile").toBoolean()
+
+                if (itemName != null && itemPath != null) {
+                    foundItems.add(SystemItem(itemName, itemPath, isFile))
+                    println("Match found: $itemName at $itemPath")
+                }
             }
-        }
 
-        indexReader.close()
-        return foundItems
+            return foundItems
+        }
     }
 }

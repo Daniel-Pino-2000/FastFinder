@@ -1,10 +1,12 @@
 // Importing necessary Compose libraries for UI components and functionality
 import androidx.compose.desktop.ui.tooling.preview.Preview
-import androidx.compose.foundation.*
+import androidx.compose.foundation.VerticalScrollbar
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
@@ -14,14 +16,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.*
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import java.io.File
-import java.sql.Time
-import kotlin.random.Random
 
 // Preview function to preview the app's UI in the IDE
 @Composable
@@ -85,6 +82,11 @@ fun FastFinderApp() {
                                 endTime = System.nanoTime()
                                 // Calculate elapsed time in seconds
                                 elapsedTime = (endTime - startTime) / 1_000_000_000.0
+                                println("\nResults summary:")
+                                testList.forEach { item ->
+                                    println("${if (item.isFile) "File" else "Dir"}: ${item.itemName}")
+                                    println("  Path: ${item.itemPath}")
+                                }
                                 true // Indicate event was handled
                             } else {
                                 false
