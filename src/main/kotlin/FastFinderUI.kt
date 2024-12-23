@@ -38,7 +38,7 @@ fun FastFinderApp() {
     val themeElements =  ThemeElements() // Instance of the data class where the UI theme elements are saved
     val lazyListState = rememberLazyListState() // LazyListState to manage the scroll state of LazyColumn
     var searchMode = SearchMode.ALL
-    val customDir = File("C:\\")  // The directory to search in when testing
+    val customDir = File("D:\\")  // The directory to search in when testing
     var startTime : Long // Variable used to record the start time
     var endTime : Long // Variable used to record the end time
     var elapsedTime = 0.0 // Calculate elapsed time in seconds

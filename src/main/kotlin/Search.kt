@@ -174,52 +174,96 @@ class Search(
     private fun searchIndex(): List<SystemItem> {
         println("\nExecuting search with value: '$searchValue'")
 
-        // Create a valid Lucene query without leading wildcards
+        // Trim and escape the search value for safety
         val searchTerm = searchValue.trim().lowercase()
-        val queryStr = """
-        name:$searchTerm* OR
-        nameOriginal:$searchTerm* OR
-        name:$searchTerm OR
-        nameOriginal:$searchTerm
-    """.trimIndent().replace("\n", " ")
 
-        println("Query: $queryStr")
-
-        val queryParser = QueryParser("name", analyzer)
-        // Set to allow leading wildcards if needed (though we're not using them in this query)
-        queryParser.allowLeadingWildcard = false
-        val query = queryParser.parse(queryStr)
+        val foundItems = mutableListOf<SystemItem>()
 
         DirectoryReader.open(indexDirectory).use { reader ->
             println("Index contains ${reader.numDocs()} documents")
 
             val searcher = IndexSearcher(reader)
-            val topDocs = searcher.search(query, Integer.MAX_VALUE)  // No limit on results
-            println("Found ${topDocs.totalHits} matching documents")
 
-            val foundItems = mutableListOf<SystemItem>()
+            // If the search term contains spaces, use PhraseQuery for an exact phrase match
+            if (searchTerm.contains(" ")) {
+                // Split the term into individual words for phrase query
+                val words = searchTerm.split(" ").map { it.lowercase() }
 
-            for (scoreDoc in topDocs.scoreDocs) {
-                val doc = searcher.doc(scoreDoc.doc)
-                val itemName = doc.get("nameOriginal") // Use original name for display
-                val itemPath = doc.get("path")
-                val isFile = doc.get("isFile").toBoolean()
+                // Create two PhraseQueries (one for "name" and one for "nameOriginal")
+                val phraseQueryName = org.apache.lucene.search.PhraseQuery.Builder()
+                val phraseQueryNameOriginal = org.apache.lucene.search.PhraseQuery.Builder()
 
-                if (itemName != null && itemPath != null) {
-                    // Filter based on search mode
-                    when (searchMode) {
-                        SearchMode.FILES -> {
-                            if (isFile) foundItems.add(SystemItem(itemName, itemPath, isFile))
+                // Add the words to both PhraseQueries (for "name" and "nameOriginal")
+                for (i in words.indices) {
+                    phraseQueryName.add(org.apache.lucene.index.Term("name", words[i]), i)
+                    phraseQueryNameOriginal.add(org.apache.lucene.index.Term("nameOriginal", words[i]), i)
+                }
+
+                // Combine both PhraseQueries using BooleanQuery
+                val booleanQuery = org.apache.lucene.search.BooleanQuery.Builder()
+                booleanQuery.add(phraseQueryName.build(), org.apache.lucene.search.BooleanClause.Occur.SHOULD)
+                booleanQuery.add(phraseQueryNameOriginal.build(), org.apache.lucene.search.BooleanClause.Occur.SHOULD)
+
+                val topDocs = searcher.search(booleanQuery.build(), Integer.MAX_VALUE)  // No limit on results
+                println("Found ${topDocs.totalHits} matching documents (phrase)")
+
+                for (scoreDoc in topDocs.scoreDocs) {
+                    val doc = searcher.doc(scoreDoc.doc)
+                    val itemName = doc.get("nameOriginal") // Use original name for display
+                    val itemPath = doc.get("path")
+                    val isFile = doc.get("isFile").toBoolean()
+
+                    if (itemName != null && itemPath != null) {
+                        // Filter based on search mode
+                        when (searchMode) {
+                            SearchMode.FILES -> {
+                                if (isFile) foundItems.add(SystemItem(itemName, itemPath, isFile))
+                            }
+                            SearchMode.DIRECTORIES -> {
+                                if (!isFile) foundItems.add(SystemItem(itemName, itemPath, isFile))
+                            }
+                            SearchMode.ALL -> {
+                                foundItems.add(SystemItem(itemName, itemPath, isFile))
+                            }
                         }
-                        SearchMode.DIRECTORIES -> {
-                            if (!isFile) foundItems.add(SystemItem(itemName, itemPath, isFile))
-                        }
-                        SearchMode.ALL -> {
-                            foundItems.add(SystemItem(itemName, itemPath, isFile))
-                        }
+
+                        println("Match found: $itemName at $itemPath")
                     }
+                }
+            } else {
+                // Single word search (wildcard search)
+                val queryStr = """name:$searchTerm* OR nameOriginal:$searchTerm*""".trimIndent().replace("\n", " ")
+                println("Query: $queryStr")
 
-                    println("Match found: $itemName at $itemPath")
+                val queryParser = QueryParser("name", analyzer)
+                queryParser.allowLeadingWildcard = true  // Allow leading wildcard for partial matches
+                val query = queryParser.parse(queryStr)
+
+                val topDocs = searcher.search(query, Integer.MAX_VALUE)  // No limit on results
+                println("Found ${topDocs.totalHits} matching documents")
+
+                for (scoreDoc in topDocs.scoreDocs) {
+                    val doc = searcher.doc(scoreDoc.doc)
+                    val itemName = doc.get("nameOriginal") // Use original name for display
+                    val itemPath = doc.get("path")
+                    val isFile = doc.get("isFile").toBoolean()
+
+                    if (itemName != null && itemPath != null) {
+                        // Filter based on search mode
+                        when (searchMode) {
+                            SearchMode.FILES -> {
+                                if (isFile) foundItems.add(SystemItem(itemName, itemPath, isFile))
+                            }
+                            SearchMode.DIRECTORIES -> {
+                                if (!isFile) foundItems.add(SystemItem(itemName, itemPath, isFile))
+                            }
+                            SearchMode.ALL -> {
+                                foundItems.add(SystemItem(itemName, itemPath, isFile))
+                            }
+                        }
+
+                        println("Match found: $itemName at $itemPath")
+                    }
                 }
             }
 
