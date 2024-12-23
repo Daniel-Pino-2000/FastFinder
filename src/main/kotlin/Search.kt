@@ -1,3 +1,4 @@
+
 import org.apache.lucene.analysis.standard.StandardAnalyzer
 import org.apache.lucene.document.Document
 import org.apache.lucene.document.Field
@@ -9,11 +10,12 @@ import org.apache.lucene.index.IndexWriterConfig
 import org.apache.lucene.queryparser.classic.QueryParser
 import org.apache.lucene.search.IndexSearcher
 import org.apache.lucene.store.Directory
-import org.apache.lucene.store.RAMDirectory
+import org.apache.lucene.store.FSDirectory
 import java.io.File
 import java.io.IOException
 import java.nio.file.*
 import java.nio.file.attribute.BasicFileAttributes
+import kotlin.io.AccessDeniedException
 
 enum class SearchMode {
     FILES,
@@ -24,25 +26,47 @@ enum class SearchMode {
 class Search(
     val searchValue: String,
     val searchMode: SearchMode,
-    val customRootDirectory: File?
+    val customRootDirectory: File?,
+    val indexDirectoryName: String = "database" // Folder name for the index
 ) {
     private val analyzer = StandardAnalyzer()
-    private val indexDirectory: Directory = RAMDirectory()
-    val skippedPaths = mutableListOf<String>()
+    private val indexDirectory: Directory
     private var totalIndexed = 0
+    val skippedPaths = mutableListOf<String>()
+
+    init {
+        // Get the current working directory (where the Kotlin files are)
+        val currentDirectory = System.getProperty("user.dir")
+        val indexPath = Paths.get(currentDirectory, indexDirectoryName)
+
+        // Create the "database" folder if it doesn't exist
+        if (!Files.exists(indexPath)) {
+            Files.createDirectories(indexPath)
+        }
+
+        // Set the index directory path to the "database" folder
+        indexDirectory = FSDirectory.open(indexPath)
+    }
 
     fun indexAndSearch(): List<SystemItem> {
         return try {
             println("Starting search for '$searchValue' in mode: $searchMode")
             println("Root directory: ${customRootDirectory?.absolutePath ?: System.getProperty("user.dir")}")
 
-            val indexWriterConfig = IndexWriterConfig(analyzer)
-            IndexWriter(indexDirectory, indexWriterConfig).use { writer ->
-                indexFilesAndDirectories(writer)
-                writer.commit()
-                println("\nIndexing completed. Total items indexed: $totalIndexed")
+            // Check if the index exists
+            if (!indexExists()) {
+                // If the index doesn't exist, create it
+                val indexWriterConfig = IndexWriterConfig(analyzer)
+                IndexWriter(indexDirectory, indexWriterConfig).use { writer ->
+                    indexFilesAndDirectories(writer)
+                    writer.commit() // Commit to the index after indexing
+                    println("\nIndexing completed. Total items indexed: $totalIndexed")
+                }
+            } else {
+                println("Index already exists, skipping indexing.")
             }
 
+            // Now perform the search
             val results = searchIndex()
             println("Search completed. Found ${results.size} results")
             results
@@ -51,6 +75,16 @@ class Search(
             e.printStackTrace()
             skippedPaths.add("Error: ${e.message}")
             emptyList()
+        }
+    }
+
+    private fun indexExists(): Boolean {
+        // Check if the index exists by trying to open it
+        return try {
+            DirectoryReader.open(indexDirectory)
+            true
+        } catch (e: IOException) {
+            false
         }
     }
 
