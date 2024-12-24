@@ -1,4 +1,6 @@
-
+/**
+ * Imports for Apache Lucene library components used for indexing and searching
+ */
 import org.apache.lucene.analysis.standard.StandardAnalyzer
 import org.apache.lucene.document.Document
 import org.apache.lucene.document.Field
@@ -7,8 +9,9 @@ import org.apache.lucene.document.TextField
 import org.apache.lucene.index.DirectoryReader
 import org.apache.lucene.index.IndexWriter
 import org.apache.lucene.index.IndexWriterConfig
-import org.apache.lucene.queryparser.classic.QueryParser
+import org.apache.lucene.index.Term
 import org.apache.lucene.search.IndexSearcher
+import org.apache.lucene.search.WildcardQuery
 import org.apache.lucene.store.Directory
 import org.apache.lucene.store.FSDirectory
 import java.io.File
@@ -17,12 +20,27 @@ import java.nio.file.*
 import java.nio.file.attribute.BasicFileAttributes
 import kotlin.io.AccessDeniedException
 
+/**
+ * Enum defining the different modes of search operation
+ * - FILES: Search only for files
+ * - DIRECTORIES: Search only for directories
+ * - ALL: Search for both files and directories
+ */
 enum class SearchMode {
     FILES,
     DIRECTORIES,
     ALL
 }
 
+/**
+ * Main search class that handles both indexing and searching of files/directories
+ * Uses Apache Lucene for creating and searching the index
+ *
+ * @property searchValue The search string provided by the user
+ * @property searchMode The type of items to search for (FILES, DIRECTORIES, or ALL)
+ * @property customRootDirectory Optional custom starting directory for the search
+ * @property indexDirectoryName Name of the directory where the Lucene index will be stored
+ */
 class Search(
     val searchValue: String,
     val searchMode: SearchMode,
@@ -34,6 +52,10 @@ class Search(
     private var totalIndexed = 0
     val skippedPaths = mutableListOf<String>()
 
+    /**
+     * Initializes the search by setting up the index directory
+     * Creates the database directory if it doesn't exist
+     */
     init {
         // Get the current working directory (where the Kotlin files are)
         val currentDirectory = System.getProperty("user.dir")
@@ -48,25 +70,30 @@ class Search(
         indexDirectory = FSDirectory.open(indexPath)
     }
 
+    /**
+     * Main function that coordinates the indexing and searching process
+     * Creates an index if one doesn't exist, then performs the search
+     *
+     * @return List of matching SystemItems based on the search criteria
+     */
     fun indexAndSearch(): List<SystemItem> {
         return try {
             println("Starting search for '$searchValue' in mode: $searchMode")
             println("Root directory: ${customRootDirectory?.absolutePath ?: System.getProperty("user.dir")}")
 
-            // Check if the index exists
+            // Check if the index exists and create if necessary
             if (!indexExists()) {
-                // If the index doesn't exist, create it
                 val indexWriterConfig = IndexWriterConfig(analyzer)
                 IndexWriter(indexDirectory, indexWriterConfig).use { writer ->
                     indexFilesAndDirectories(writer)
-                    writer.commit() // Commit to the index after indexing
+                    writer.commit()
                     println("\nIndexing completed. Total items indexed: $totalIndexed")
                 }
             } else {
                 println("Index already exists, skipping indexing.")
             }
 
-            // Now perform the search
+            // Perform the search
             val results = searchIndex()
             println("Search completed. Found ${results.size} results")
             results
@@ -78,8 +105,12 @@ class Search(
         }
     }
 
+    /**
+     * Checks if a Lucene index already exists in the specified directory
+     *
+     * @return true if index exists, false otherwise
+     */
     private fun indexExists(): Boolean {
-        // Check if the index exists by trying to open it
         return try {
             DirectoryReader.open(indexDirectory)
             true
@@ -88,11 +119,18 @@ class Search(
         }
     }
 
+    /**
+     * Recursively walks through the directory tree and indexes files and directories
+     * Uses Java's FileVisitor pattern for traversal
+     *
+     * @param indexWriter The Lucene IndexWriter instance used to add documents to the index
+     */
     private fun indexFilesAndDirectories(indexWriter: IndexWriter) {
         val rootPath = customRootDirectory?.toPath() ?: Paths.get(System.getProperty("user.dir"))
         println("Walking directory tree from: ${rootPath.toAbsolutePath()}")
 
         Files.walkFileTree(rootPath, object : SimpleFileVisitor<Path>() {
+            // Handle regular files
             override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
                 if (searchMode == SearchMode.FILES || searchMode == SearchMode.ALL) {
                     try {
@@ -106,6 +144,7 @@ class Search(
                 return FileVisitResult.CONTINUE
             }
 
+            // Handle directories before entering them
             override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
                 if (isRestrictedDirectory(dir)) {
                     skippedPaths.add("Directory: ${dir.toString()} (Restricted)")
@@ -126,6 +165,7 @@ class Search(
                 return FileVisitResult.CONTINUE
             }
 
+            // Handle failures during traversal
             override fun visitFileFailed(file: Path, exc: IOException): FileVisitResult {
                 skippedPaths.add("Failed to access: ${file.toString()} (${exc.message})")
                 return FileVisitResult.CONTINUE
@@ -133,12 +173,19 @@ class Search(
         })
     }
 
+    /**
+     * Adds a single file or directory to the Lucene index
+     *
+     * @param path Path to the file or directory
+     * @param indexWriter The Lucene IndexWriter instance
+     * @param isFile Boolean indicating if the path is a file (true) or directory (false)
+     */
     private fun addToIndex(path: Path, indexWriter: IndexWriter, isFile: Boolean) {
         val document = Document()
 
         val fullFileName = path.fileName?.toString() ?: return
 
-        // Store both original and lowercase versions
+        // Store both original and lowercase versions for case-insensitive search
         document.add(TextField("nameOriginal", fullFileName, Field.Store.YES))
         document.add(TextField("name", fullFileName.lowercase(), Field.Store.YES))
 
@@ -146,18 +193,26 @@ class Search(
         val parentPath = path.parent?.toString() ?: ""
         document.add(StringField("parent", parentPath, Field.Store.YES))
 
-        // Store the full absolute path
+        // Store the full absolute path and item type
         document.add(StringField("path", path.toAbsolutePath().toString(), Field.Store.YES))
         document.add(StringField("isFile", isFile.toString(), Field.Store.YES))
 
         indexWriter.addDocument(document)
         totalIndexed++
 
+        // Progress reporting
         if (totalIndexed % 1000 == 0) {
             println("Indexed $totalIndexed items...")
         }
     }
 
+    /**
+     * Checks if a directory should be excluded from indexing
+     * Prevents indexing of system directories and other restricted locations
+     *
+     * @param path Path to check
+     * @return true if the directory should be restricted, false otherwise
+     */
     private fun isRestrictedDirectory(path: Path): Boolean {
         val restrictedDirs = setOf(
             "\$Recycle.Bin",
@@ -171,11 +226,21 @@ class Search(
         return restrictedDirs.any { restricted -> pathStr.contains(restricted.lowercase()) }
     }
 
+    /**
+     * Performs the actual search in the Lucene index using Search Everything-style matching
+     * Search behavior:
+     * - Case-insensitive matching
+     * - Each word in the search query must be present in the filename
+     * - Words can appear in any order
+     * - Words can be substrings of longer words
+     *
+     * @return List of matching SystemItems filtered by the current searchMode
+     */
     private fun searchIndex(): List<SystemItem> {
         println("\nExecuting search with value: '$searchValue'")
 
-        // Trim and escape the search value for safety
-        val searchTerm = searchValue.trim().lowercase()
+        // Split search into terms and remove empty strings
+        val searchTerms = searchValue.trim().lowercase().split(" ").filter { it.isNotEmpty() }
 
         val foundItems = mutableListOf<SystemItem>()
 
@@ -183,92 +248,52 @@ class Search(
             println("Index contains ${reader.numDocs()} documents")
 
             val searcher = IndexSearcher(reader)
+            val booleanQuery = org.apache.lucene.search.BooleanQuery.Builder()
 
-            // If the search term contains spaces, use PhraseQuery for an exact phrase match
-            if (searchTerm.contains(" ")) {
-                // Split the term into individual words for phrase query
-                val words = searchTerm.split(" ").map { it.lowercase() }
+            // Process each search term
+            for (term in searchTerms) {
+                val termQuery = org.apache.lucene.search.BooleanQuery.Builder()
 
-                // Create two PhraseQueries (one for "name" and one for "nameOriginal")
-                val phraseQueryName = org.apache.lucene.search.PhraseQuery.Builder()
-                val phraseQueryNameOriginal = org.apache.lucene.search.PhraseQuery.Builder()
+                // Create wildcard queries for substring matching
+                val wildcardQueryName = WildcardQuery(Term("name", "*${term}*"))
+                val wildcardQueryNameOriginal = WildcardQuery(Term("nameOriginal", "*${term}*"))
 
-                // Add the words to both PhraseQueries (for "name" and "nameOriginal")
-                for (i in words.indices) {
-                    phraseQueryName.add(org.apache.lucene.index.Term("name", words[i]), i)
-                    phraseQueryNameOriginal.add(org.apache.lucene.index.Term("nameOriginal", words[i]), i)
-                }
+                // Term can match in either field (SHOULD = OR)
+                termQuery.add(wildcardQueryName, org.apache.lucene.search.BooleanClause.Occur.SHOULD)
+                termQuery.add(wildcardQueryNameOriginal, org.apache.lucene.search.BooleanClause.Occur.SHOULD)
 
-                // Combine both PhraseQueries using BooleanQuery
-                val booleanQuery = org.apache.lucene.search.BooleanQuery.Builder()
-                booleanQuery.add(phraseQueryName.build(), org.apache.lucene.search.BooleanClause.Occur.SHOULD)
-                booleanQuery.add(phraseQueryNameOriginal.build(), org.apache.lucene.search.BooleanClause.Occur.SHOULD)
+                // All terms must be present (MUST = AND)
+                booleanQuery.add(termQuery.build(), org.apache.lucene.search.BooleanClause.Occur.MUST)
+            }
 
-                val topDocs = searcher.search(booleanQuery.build(), Integer.MAX_VALUE)  // No limit on results
-                println("Found ${topDocs.totalHits} matching documents (phrase)")
+            // Execute search and process results
+            val topDocs = searcher.search(booleanQuery.build(), Integer.MAX_VALUE)
+            println("Found ${topDocs.totalHits} matching documents")
 
-                for (scoreDoc in topDocs.scoreDocs) {
-                    val doc = searcher.doc(scoreDoc.doc)
-                    val itemName = doc.get("nameOriginal") // Use original name for display
-                    val itemPath = doc.get("path")
-                    val isFile = doc.get("isFile").toBoolean()
+            for (scoreDoc in topDocs.scoreDocs) {
+                val doc = searcher.doc(scoreDoc.doc)
+                val itemName = doc.get("nameOriginal")
+                val itemPath = doc.get("path")
+                val isFile = doc.get("isFile").toBoolean()
 
-                    if (itemName != null && itemPath != null) {
-                        // Filter based on search mode
-                        when (searchMode) {
-                            SearchMode.FILES -> {
-                                if (isFile) foundItems.add(SystemItem(itemName, itemPath, isFile))
-                            }
-                            SearchMode.DIRECTORIES -> {
-                                if (!isFile) foundItems.add(SystemItem(itemName, itemPath, isFile))
-                            }
-                            SearchMode.ALL -> {
-                                foundItems.add(SystemItem(itemName, itemPath, isFile))
-                            }
+                if (itemName != null && itemPath != null) {
+                    // Filter results based on search mode
+                    when (searchMode) {
+                        SearchMode.FILES -> {
+                            if (isFile) foundItems.add(SystemItem(itemName, itemPath, isFile))
                         }
-
-                        println("Match found: $itemName at $itemPath")
-                    }
-                }
-            } else {
-                // Single word search (wildcard search)
-                val queryStr = """name:$searchTerm* OR nameOriginal:$searchTerm*""".trimIndent().replace("\n", " ")
-                println("Query: $queryStr")
-
-                val queryParser = QueryParser("name", analyzer)
-                queryParser.allowLeadingWildcard = true  // Allow leading wildcard for partial matches
-                val query = queryParser.parse(queryStr)
-
-                val topDocs = searcher.search(query, Integer.MAX_VALUE)  // No limit on results
-                println("Found ${topDocs.totalHits} matching documents")
-
-                for (scoreDoc in topDocs.scoreDocs) {
-                    val doc = searcher.doc(scoreDoc.doc)
-                    val itemName = doc.get("nameOriginal") // Use original name for display
-                    val itemPath = doc.get("path")
-                    val isFile = doc.get("isFile").toBoolean()
-
-                    if (itemName != null && itemPath != null) {
-                        // Filter based on search mode
-                        when (searchMode) {
-                            SearchMode.FILES -> {
-                                if (isFile) foundItems.add(SystemItem(itemName, itemPath, isFile))
-                            }
-                            SearchMode.DIRECTORIES -> {
-                                if (!isFile) foundItems.add(SystemItem(itemName, itemPath, isFile))
-                            }
-                            SearchMode.ALL -> {
-                                foundItems.add(SystemItem(itemName, itemPath, isFile))
-                            }
+                        SearchMode.DIRECTORIES -> {
+                            if (!isFile) foundItems.add(SystemItem(itemName, itemPath, isFile))
                         }
-
-                        println("Match found: $itemName at $itemPath")
+                        SearchMode.ALL -> {
+                            foundItems.add(SystemItem(itemName, itemPath, isFile))
+                        }
                     }
+                    println("Match found: $itemName at $itemPath")
                 }
             }
 
             return foundItems
         }
     }
-
 }
