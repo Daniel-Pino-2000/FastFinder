@@ -26,23 +26,29 @@ enum class SearchMode {
 class Search(
     val searchValue: String,
     val searchMode: SearchMode,
-    val customRootDirectory: File?,
+    val customRootDirectory: File? = null,
     val indexDirectoryName: String = "database"
 ) {
     private val analyzer = StandardAnalyzer()
     private val indexDirectory: Directory
     private var totalIndexed = 0
     val skippedPaths = mutableListOf<String>()
+    private val indexPath: Path
 
     init {
         val currentDirectory = System.getProperty("user.dir")
-        val indexPath = Paths.get(currentDirectory, indexDirectoryName)
+        indexPath = Paths.get(currentDirectory, indexDirectoryName)
 
         if (!Files.exists(indexPath)) {
             Files.createDirectories(indexPath)
         }
 
         indexDirectory = FSDirectory.open(indexPath)
+    }
+
+    // Log the directory path when needed
+    private fun getIndexDirectoryPath(): String {
+        return indexPath.toString()
     }
 
     fun indexAndSearch(): List<SystemItem> {
@@ -168,23 +174,30 @@ class Search(
         val searchTerms = searchValue.trim().lowercase().split(" ").filter { it.isNotEmpty() }
         val foundItems = mutableListOf<SystemItem>()
 
-        DirectoryReader.open(indexDirectory).use { reader ->
+        // Use a single BooleanQuery to combine all search terms
+        val booleanQuery = org.apache.lucene.search.BooleanQuery.Builder()
+
+        for (term in searchTerms) {
+            val wildcardQueryName = WildcardQuery(Term("name", "*${term}*"))
+            val wildcardQueryNameOriginal = WildcardQuery(Term("nameOriginal", "*${term}*"))
+
+            // Use "SHOULD" to allow matching either "name" or "nameOriginal"
+            booleanQuery.add(wildcardQueryName, org.apache.lucene.search.BooleanClause.Occur.SHOULD)
+            booleanQuery.add(wildcardQueryNameOriginal, org.apache.lucene.search.BooleanClause.Occur.SHOULD)
+        }
+
+        // Open the reader and search the index (reuse searcher)
+        val reader = DirectoryReader.open(indexDirectory)
+        val searcher = IndexSearcher(reader)
+
+        try {
             println("Index contains ${reader.numDocs()} documents")
-            val searcher = IndexSearcher(reader)
-            val booleanQuery = org.apache.lucene.search.BooleanQuery.Builder()
 
-            for (term in searchTerms) {
-                val termQuery = org.apache.lucene.search.BooleanQuery.Builder()
-                val wildcardQueryName = WildcardQuery(Term("name", "*${term}*"))
-                val wildcardQueryNameOriginal = WildcardQuery(Term("nameOriginal", "*${term}*"))
-                termQuery.add(wildcardQueryName, org.apache.lucene.search.BooleanClause.Occur.SHOULD)
-                termQuery.add(wildcardQueryNameOriginal, org.apache.lucene.search.BooleanClause.Occur.SHOULD)
-                booleanQuery.add(termQuery.build(), org.apache.lucene.search.BooleanClause.Occur.MUST)
-            }
-
+            // Execute the query
             val topDocs = searcher.search(booleanQuery.build(), Integer.MAX_VALUE)
             println("Found ${topDocs.totalHits} matching documents")
 
+            // Collect the results
             for (scoreDoc in topDocs.scoreDocs) {
                 val doc = searcher.doc(scoreDoc.doc)
                 val itemName = doc.get("nameOriginal")
@@ -200,7 +213,11 @@ class Search(
                     println("Match found: $itemName at $itemPath")
                 }
             }
+        } finally {
+            reader.close() // Ensure the reader is always closed
         }
+
         return foundItems
     }
+
 }
