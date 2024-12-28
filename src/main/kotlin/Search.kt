@@ -18,6 +18,7 @@ import java.io.File
 import java.io.IOException
 import java.nio.file.*
 import java.nio.file.attribute.BasicFileAttributes
+import java.util.concurrent.Executors
 import kotlin.io.AccessDeniedException
 
 /**
@@ -131,64 +132,81 @@ class Search(
      *
      * @param indexWriter The Lucene IndexWriter instance used to add documents to the index
      */
+
     private fun indexFilesAndDirectories(indexWriter: IndexWriter) {
         // Get all available drives (e.g., C:, D:, etc.)
         val roots = File.listRoots()
 
-        // Iterate through each drive and index its files and directories
-        for (root in roots) {
-            val rootPath = root.toPath()
-            println("Walking directory tree from: ${rootPath.toAbsolutePath()}")
+        // Create a fixed thread pool for parallel processing
+        val executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors())
 
-            try {
-                // Use Files.walkFileTree to index files and directories on this drive
-                Files.walkFileTree(rootPath, object : SimpleFileVisitor<Path>() {
-                    // Handle regular files
-                    override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
-                        if (searchMode == SearchMode.FILES || searchMode == SearchMode.ALL) {
-                            try {
-                                addToIndex(file, indexWriter, true)
-                            } catch (e: AccessDeniedException) {
-                                skippedPaths.add("File: ${file.toString()} (Access Denied)")
-                            } catch (e: Exception) {
-                                skippedPaths.add("File: ${file.toString()} (${e.message})")
+        // Submit each root directory indexing task to the thread pool
+        roots.forEach { root ->
+            executor.submit {
+                val rootPath = root.toPath()
+                println("Walking directory tree from: ${rootPath.toAbsolutePath()}")
+
+                try {
+                    // Use Files.walkFileTree to index files and directories on this drive
+                    Files.walkFileTree(rootPath, object : SimpleFileVisitor<Path>() {
+                        // Handle regular files
+                        override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
+                            if (searchMode == SearchMode.FILES || searchMode == SearchMode.ALL) {
+                                try {
+                                    addToIndex(file, indexWriter, true)
+                                } catch (e: AccessDeniedException) {
+                                    skippedPaths.add("File: ${file.toString()} (Access Denied)")
+                                } catch (e: Exception) {
+                                    skippedPaths.add("File: ${file.toString()} (${e.message})")
+                                }
                             }
-                        }
-                        return FileVisitResult.CONTINUE
-                    }
-
-                    // Handle directories before entering them
-                    override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
-                        if (isRestrictedDirectory(dir)) {
-                            skippedPaths.add("Directory: ${dir.toString()} (Restricted)")
-                            return FileVisitResult.SKIP_SUBTREE
+                            return FileVisitResult.CONTINUE
                         }
 
-                        if (searchMode == SearchMode.DIRECTORIES || searchMode == SearchMode.ALL) {
-                            try {
-                                addToIndex(dir, indexWriter, false)
-                            } catch (e: AccessDeniedException) {
-                                skippedPaths.add("Directory: ${dir.toString()} (Access Denied)")
-                                return FileVisitResult.SKIP_SUBTREE
-                            } catch (e: Exception) {
-                                skippedPaths.add("Directory: ${dir.toString()} (${e.message})")
+                        // Handle directories before entering them
+                        override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
+                            if (isRestrictedDirectory(dir)) {
+                                skippedPaths.add("Directory: ${dir.toString()} (Restricted)")
                                 return FileVisitResult.SKIP_SUBTREE
                             }
-                        }
-                        return FileVisitResult.CONTINUE
-                    }
 
-                    // Handle failures during traversal
-                    override fun visitFileFailed(file: Path, exc: IOException): FileVisitResult {
-                        skippedPaths.add("Failed to access: ${file.toString()} (${exc.message})")
-                        return FileVisitResult.CONTINUE
-                    }
-                })
-            } catch (e: Exception) {
-                println("Error walking through the root directory $root: ${e.message}")
+                            if (searchMode == SearchMode.DIRECTORIES || searchMode == SearchMode.ALL) {
+                                try {
+                                    addToIndex(dir, indexWriter, false)
+                                } catch (e: AccessDeniedException) {
+                                    skippedPaths.add("Directory: ${dir.toString()} (Access Denied)")
+                                    return FileVisitResult.SKIP_SUBTREE
+                                } catch (e: Exception) {
+                                    skippedPaths.add("Directory: ${dir.toString()} (${e.message})")
+                                    return FileVisitResult.SKIP_SUBTREE
+                                }
+                            }
+                            return FileVisitResult.CONTINUE
+                        }
+
+                        // Handle failures during traversal
+                        override fun visitFileFailed(file: Path, exc: IOException): FileVisitResult {
+                            skippedPaths.add("Failed to access: ${file.toString()} (${exc.message})")
+                            return FileVisitResult.CONTINUE
+                        }
+                    })
+                } catch (e: Exception) {
+                    println("Error walking through the root directory $root: ${e.message}")
+                }
             }
         }
+
+        // Shutdown the executor and wait for all tasks to complete
+        executor.shutdown()
+        try {
+            if (!executor.awaitTermination(1, java.util.concurrent.TimeUnit.HOURS)) {
+                println("Timeout waiting for indexing tasks to complete.")
+            }
+        } catch (e: InterruptedException) {
+            println("Thread interrupted: ${e.message}")
+        }
     }
+
 
 
     /**
