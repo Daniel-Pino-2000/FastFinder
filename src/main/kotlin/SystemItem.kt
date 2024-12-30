@@ -11,3 +11,15 @@ class SystemItem(
 ) {
 
 }
+
+/**
+ * Enum defining the different modes of search operation
+ * - FILES: Search only for files
+ * - DIRECTORIES: Search only for directories
+ * - ALL: Search for both files and directories
+ */
+enum class SearchMode {
+    FILES,
+    DIRECTORIES,
+    ALL
+}
