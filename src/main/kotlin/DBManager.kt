@@ -15,6 +15,7 @@ import java.nio.file.attribute.BasicFileAttributes
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.Executors
+import kotlin.concurrent.thread
 import kotlin.io.AccessDeniedException
 
 class DBManager(private val indexDirectoryName: String = "database") {
@@ -25,22 +26,16 @@ class DBManager(private val indexDirectoryName: String = "database") {
     private val indexPath: Path
 
     init {
-        // Get the current working directory (where the Kotlin files are)
         val currentDirectory = System.getProperty("user.dir")
         indexPath = Paths.get(currentDirectory, indexDirectoryName)
 
-        // Create the "database" folder if it doesn't exist
         if (!Files.exists(indexPath)) {
             Files.createDirectories(indexPath)
         }
 
-        // Set the index directory path to the "database" folder
         indexDirectory = FSDirectory.open(indexPath)
     }
 
-    /**
-     * Checks if the Lucene index already exists.
-     */
     fun indexExists(): Boolean {
         return try {
             DirectoryReader.open(indexDirectory)
@@ -50,37 +45,35 @@ class DBManager(private val indexDirectoryName: String = "database") {
         }
     }
 
-    /**
-     * Creates or updates the Lucene index by indexing files and directories.
-     */
-    fun createOrUpdateIndex() {
+    fun createOrUpdateIndex(forceIndexCreation: Boolean = false) {
         val today = LocalDate.now().format(DateTimeFormatter.ISO_DATE)
         val lastModifiedDate = getLastModifiedDate()
 
-        // Check if the index exists and if it was modified today
-        if (!indexExists() || lastModifiedDate != today) {
-            // If the index was modified before today, create a new one
-            val newIndexPath = indexPath.resolve("new_index_$today")
-            val newIndexDir = FSDirectory.open(newIndexPath)
+        // If forceIndexCreation is true, or the index doesn't exist or needs an update
+        if (forceIndexCreation || !indexExists() || lastModifiedDate != today) {
+            // Perform indexing in a separate thread to allow searching in the old index.
+            thread(start = true) {
+                val newIndexPath = indexPath.resolve("new_index_$today")
+                val newIndexDir = FSDirectory.open(newIndexPath)
 
-            val indexWriterConfig = IndexWriterConfig(analyzer)
-            IndexWriter(newIndexDir, indexWriterConfig).use { writer ->
-                // Silent output during indexing process, only showing progress
-                indexFilesAndDirectories(writer)
-                writer.commit()
+                val indexWriterConfig = IndexWriterConfig(analyzer)
+                IndexWriter(newIndexDir, indexWriterConfig).use { writer ->
+                    indexFilesAndDirectories(writer)
+                    writer.commit()
+                }
+
+                println("\nIndexing completed. Total items indexed: $totalIndexed")
+                replaceOldIndexWithNew(newIndexPath)
             }
-            println("\nIndexing completed. Total items indexed: $totalIndexed")
 
-            // Once new index is created, delete old index and replace with new one
-            replaceOldIndexWithNew(newIndexPath)
+            println("Indexing process started in the background.")
+            println("You can search in the old index while the new one is being created.")
+
         } else {
             println("Index already exists and was created today, skipping indexing.")
         }
     }
 
-    /**
-     * Gets the last modified date of the current index directory
-     */
     private fun getLastModifiedDate(): String {
         val directoryFile = indexPath.toFile()
         return if (directoryFile.exists()) {
@@ -92,9 +85,6 @@ class DBManager(private val indexDirectoryName: String = "database") {
         }
     }
 
-    /**
-     * Recursively walks through the directory tree and indexes files and directories.
-     */
     private fun indexFilesAndDirectories(indexWriter: IndexWriter) {
         val roots = File.listRoots()
 
@@ -103,6 +93,8 @@ class DBManager(private val indexDirectoryName: String = "database") {
         roots.forEach { root ->
             executor.submit {
                 val rootPath = root.toPath()
+                println("Walking directory tree from: ${rootPath.toAbsolutePath()}")
+
                 try {
                     Files.walkFileTree(rootPath, object : SimpleFileVisitor<Path>() {
                         override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
@@ -155,12 +147,8 @@ class DBManager(private val indexDirectoryName: String = "database") {
         }
     }
 
-    /**
-     * Adds a single file or directory to the Lucene index.
-     */
     private fun addToIndex(path: Path, indexWriter: IndexWriter, isFile: Boolean) {
         val document = Document()
-
         val fullFileName = path.fileName?.toString() ?: return
         document.add(TextField("nameOriginal", fullFileName, Field.Store.YES))
         document.add(TextField("name", fullFileName.lowercase(), Field.Store.YES))
@@ -177,9 +165,6 @@ class DBManager(private val indexDirectoryName: String = "database") {
         }
     }
 
-    /**
-     * Checks if a directory should be excluded from indexing.
-     */
     private fun isRestrictedDirectory(path: Path): Boolean {
         val restrictedDirs = setOf(
             "\$Recycle.Bin",
@@ -193,9 +178,6 @@ class DBManager(private val indexDirectoryName: String = "database") {
         return restrictedDirs.any { restricted -> pathStr.contains(restricted.lowercase()) }
     }
 
-    /**
-     * Replaces the old index with the new one.
-     */
     private fun replaceOldIndexWithNew(newIndexPath: Path) {
         // Rename the old index if exists
         val oldIndexPath = indexPath.resolve("old_index")
@@ -207,5 +189,7 @@ class DBManager(private val indexDirectoryName: String = "database") {
         // Rename new index to default index
         val newIndexDir = newIndexPath.toFile()
         newIndexDir.renameTo(indexPath.toFile())
+        println("Old index replaced with the new one.")
     }
 }
+

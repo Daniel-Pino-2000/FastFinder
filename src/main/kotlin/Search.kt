@@ -22,7 +22,7 @@ class Search(
         return try {
 
             // Ensure the index is created or updated
-            dbManager.createOrUpdateIndex()
+            dbManager.createOrUpdateIndex(true)
 
             // Perform the search
             val results = searchIndex()
