@@ -13,6 +13,8 @@ import java.io.File
 import java.io.IOException
 import java.nio.file.*
 import java.nio.file.attribute.BasicFileAttributes
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.concurrent.Executors
 import kotlin.io.AccessDeniedException
 
@@ -21,11 +23,12 @@ class DBManager(private val indexDirectoryName: String = "database") {
     val indexDirectory: Directory
     private var totalIndexed = 0
     val skippedPaths = mutableListOf<String>()
+    private val indexPath: Path
 
     init {
         // Get the current working directory (where the Kotlin files are)
         val currentDirectory = System.getProperty("user.dir")
-        val indexPath = Paths.get(currentDirectory, indexDirectoryName)
+        indexPath = Paths.get(currentDirectory, indexDirectoryName)
 
         // Create the "database" folder if it doesn't exist
         if (!Files.exists(indexPath)) {
@@ -52,15 +55,40 @@ class DBManager(private val indexDirectoryName: String = "database") {
      * Creates or updates the Lucene index by indexing files and directories.
      */
     fun createOrUpdateIndex() {
-        if (!indexExists()) {
+        val today = LocalDate.now().format(DateTimeFormatter.ISO_DATE)
+        val lastModifiedDate = getLastModifiedDate()
+
+        // Check if the index exists and if it was modified today
+        if (!indexExists() || lastModifiedDate != today) {
+            // If the index was modified before today, create a new one
+            val newIndexPath = indexPath.resolve("new_index_$today")
+            val newIndexDir = FSDirectory.open(newIndexPath)
+
             val indexWriterConfig = IndexWriterConfig(analyzer)
-            IndexWriter(indexDirectory, indexWriterConfig).use { writer ->
+            IndexWriter(newIndexDir, indexWriterConfig).use { writer ->
                 indexFilesAndDirectories(writer)
                 writer.commit()
             }
             println("\nIndexing completed. Total items indexed: $totalIndexed")
+
+            // Once new index is created, delete old index and replace with new one
+            replaceOldIndexWithNew(newIndexPath)
         } else {
-            println("Index already exists, skipping indexing.")
+            println("Index already exists and was created today, skipping indexing.")
+        }
+    }
+
+    /**
+     * Gets the last modified date of the current index directory
+     */
+    private fun getLastModifiedDate(): String {
+        val directoryFile = indexPath.toFile()
+        return if (directoryFile.exists()) {
+            val lastModifiedMillis = directoryFile.lastModified()
+            val lastModifiedDate = LocalDate.ofEpochDay(lastModifiedMillis / (24 * 60 * 60 * 1000))
+            lastModifiedDate.format(DateTimeFormatter.ISO_DATE)
+        } else {
+            ""
         }
     }
 
@@ -165,5 +193,21 @@ class DBManager(private val indexDirectoryName: String = "database") {
 
         val pathStr = path.toString().lowercase()
         return restrictedDirs.any { restricted -> pathStr.contains(restricted.lowercase()) }
+    }
+
+    /**
+     * Replaces the old index with the new one.
+     */
+    private fun replaceOldIndexWithNew(newIndexPath: Path) {
+        // Rename the old index if exists
+        val oldIndexPath = indexPath.resolve("old_index")
+        val oldIndexDir = oldIndexPath.toFile()
+        if (oldIndexDir.exists()) {
+            oldIndexDir.deleteRecursively()
+        }
+
+        // Rename new index to default index
+        val newIndexDir = newIndexPath.toFile()
+        newIndexDir.renameTo(indexPath.toFile())
     }
 }
