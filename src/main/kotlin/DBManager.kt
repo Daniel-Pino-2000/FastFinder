@@ -1,3 +1,4 @@
+
 import org.apache.lucene.analysis.standard.StandardAnalyzer
 import org.apache.lucene.document.Document
 import org.apache.lucene.document.Field
@@ -6,7 +7,6 @@ import org.apache.lucene.document.TextField
 import org.apache.lucene.index.DirectoryReader
 import org.apache.lucene.index.IndexWriter
 import org.apache.lucene.index.IndexWriterConfig
-import org.apache.lucene.store.Directory
 import org.apache.lucene.store.FSDirectory
 import java.io.File
 import java.io.IOException
@@ -20,10 +20,12 @@ import kotlin.io.AccessDeniedException
 
 class DBManager(private val indexDirectoryName: String = "database") {
     private val analyzer = StandardAnalyzer()
-    val indexDirectory: Directory
     private var totalIndexed = 0
     val skippedPaths = mutableListOf<String>()
     private val indexPath: Path
+    private val indexDirectoryPath: File = File("database/new_index_2025-01-08")
+    private val indexDirectory = FSDirectory.open(indexDirectoryPath.toPath())
+    private var indexWriter: IndexWriter? = null
 
     init {
         val currentDirectory = System.getProperty("user.dir")
@@ -32,8 +34,25 @@ class DBManager(private val indexDirectoryName: String = "database") {
         if (!Files.exists(indexPath)) {
             Files.createDirectories(indexPath)
         }
+    }
 
-        indexDirectory = FSDirectory.open(indexPath)
+    /**
+     * Get the shared IndexWriter instance.
+     */
+    fun getIndexWriter(): IndexWriter {
+        if (indexWriter == null) {
+            val config = IndexWriterConfig()
+            indexWriter = IndexWriter(indexDirectory, config)
+        }
+        return indexWriter!!
+    }
+
+    /**
+     * Commit and close the IndexWriter (if needed).
+     */
+    fun closeWriter() {
+        indexWriter?.close()
+        indexWriter = null
     }
 
     fun indexExists(): Boolean {

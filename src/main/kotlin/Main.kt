@@ -21,10 +21,13 @@ fun main() = application {
             windowState.size = androidx.compose.ui.unit.DpSize(1500.dp, 1500.dp)
         }
 
+        // Start index creation in a background thread
+        Thread {
+            val dbManager = DBManager()
+            dbManager.createOrUpdateIndex(true) // Create or update the index in the background
+        }.start()
 
         // Call the FastFinderApp composable to display the main content
         FastFinderApp()
     }
 }
-
-

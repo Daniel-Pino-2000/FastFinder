@@ -1,31 +1,39 @@
-
 import org.apache.lucene.index.DirectoryReader
 import org.apache.lucene.index.Term
-import org.apache.lucene.search.BooleanClause
-import org.apache.lucene.search.BooleanQuery
-import org.apache.lucene.search.IndexSearcher
-import org.apache.lucene.search.WildcardQuery
+import org.apache.lucene.search.*
+import org.apache.lucene.store.Directory
+import org.apache.lucene.store.FSDirectory
 import java.io.File
+import java.nio.file.Paths
 
 class Search(
-    val searchValue: String,
-    val searchMode: SearchMode,
-    val customRootDirectory: File? = null
+    private val searchValue: String,
+    private val searchMode: SearchMode,
+    private val customRootDirectory: Any? = null, // Accept File or Directory
+    private val dbManager: DBManager = DBManager()
 ) {
-    private val dbManager = DBManager()
-    private val indexDirectory = dbManager.indexDirectory
+    private val searcherManager: SearcherManager = if (customRootDirectory != null) {
+        val directory = when (customRootDirectory) {
+            is Directory -> customRootDirectory
+            is File -> FSDirectory.open(Paths.get(customRootDirectory.toURI()))
+            else -> throw IllegalArgumentException("customRootDirectory must be either a Directory or a File")
+        }
+        val directoryReader = DirectoryReader.open(directory)
+        SearcherManager(directoryReader, null)
+    } else {
+        val indexWriter = dbManager.getIndexWriter()
+        SearcherManager(indexWriter, null)
+    }
 
     /**
-     * Main function that performs the search.
+     * Perform the search.
      */
     fun search(): List<SystemItem> {
         return try {
+            // Ensure the index is up-to-date
+            searcherManager.maybeRefresh()
 
-            // Ensure the index is created or updated
-            dbManager.createOrUpdateIndex(true)
-
-            // Perform the search
-            val results = searchIndex()
+            val results = performSearch()
             println("Search completed. Found ${results.size} results")
             results
         } catch (e: Exception) {
@@ -36,14 +44,15 @@ class Search(
     }
 
     /**
-     * Performs the actual search in the Lucene index.
+     * Perform the actual search using the shared SearcherManager.
      */
-    private fun searchIndex(): List<SystemItem> {
+    private fun performSearch(): List<SystemItem> {
         val searchTerms = searchValue.trim().lowercase().split(" ").filter { it.isNotEmpty() }
         val foundItems = mutableListOf<SystemItem>()
 
-        DirectoryReader.open(indexDirectory).use { reader ->
-            val searcher = IndexSearcher(reader)
+        // Acquire the searcher
+        val searcher: IndexSearcher = searcherManager.acquire()
+        try {
             val booleanQuery = BooleanQuery.Builder()
 
             for (term in searchTerms) {
@@ -51,7 +60,6 @@ class Search(
                 val wildcardQueryName = WildcardQuery(Term("name", "*${term}*"))
                 val wildcardQueryNameOriginal = WildcardQuery(Term("nameOriginal", "*${term}*"))
 
-                // Updated use of BooleanClause.Occur
                 termQuery.add(wildcardQueryName, BooleanClause.Occur.SHOULD)
                 termQuery.add(wildcardQueryNameOriginal, BooleanClause.Occur.SHOULD)
 
@@ -73,7 +81,10 @@ class Search(
                     }
                 }
             }
-            return foundItems
+        } finally {
+            // Release the searcher after use
+            searcherManager.release(searcher)
         }
+        return foundItems
     }
 }
