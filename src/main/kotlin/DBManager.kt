@@ -1,4 +1,3 @@
-
 import org.apache.lucene.analysis.standard.StandardAnalyzer
 import org.apache.lucene.document.Document
 import org.apache.lucene.document.Field
@@ -66,6 +65,7 @@ class DBManager(private val indexDirectoryName: String = "database") {
 
             val indexWriterConfig = IndexWriterConfig(analyzer)
             IndexWriter(newIndexDir, indexWriterConfig).use { writer ->
+                // Silent output during indexing process, only showing progress
                 indexFilesAndDirectories(writer)
                 writer.commit()
             }
@@ -103,8 +103,6 @@ class DBManager(private val indexDirectoryName: String = "database") {
         roots.forEach { root ->
             executor.submit {
                 val rootPath = root.toPath()
-                println("Walking directory tree from: ${rootPath.toAbsolutePath()}")
-
                 try {
                     Files.walkFileTree(rootPath, object : SimpleFileVisitor<Path>() {
                         override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {

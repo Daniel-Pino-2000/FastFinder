@@ -20,8 +20,6 @@ class Search(
      */
     fun search(): List<SystemItem> {
         return try {
-            println("Starting search for '$searchValue' in mode: $searchMode")
-            println("Root directory: ${customRootDirectory?.absolutePath ?: System.getProperty("user.dir")}")
 
             // Ensure the index is created or updated
             dbManager.createOrUpdateIndex()
@@ -73,7 +71,6 @@ class Search(
                         SearchMode.DIRECTORIES -> if (!isFile) foundItems.add(SystemItem(itemName, itemPath, isFile))
                         SearchMode.ALL -> foundItems.add(SystemItem(itemName, itemPath, isFile))
                     }
-                    println("Match found: $itemName at $itemPath")
                 }
             }
             return foundItems

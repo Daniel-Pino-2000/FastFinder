@@ -82,11 +82,6 @@ fun FastFinderApp() {
                                 endTime = System.nanoTime()
                                 // Calculate elapsed time in seconds
                                 elapsedTime = (endTime - startTime) / 1_000_000_000.0
-                                println("\nResults summary:")
-                                testList.forEach { item ->
-                                    println("${if (item.isFile) "File" else "Dir"}: ${item.itemName}")
-                                    println("  Path: ${item.itemPath}")
-                                }
                                 true // Indicate event was handled
                             } else {
                                 false
