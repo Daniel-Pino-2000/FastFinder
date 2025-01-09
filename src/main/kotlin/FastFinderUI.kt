@@ -96,7 +96,7 @@ fun FastFinderApp() {
                         onClick = {
                             startTime = System.nanoTime()
                             testList = emptyList()
-                            testList = testList + (Search(searchValue = searchValue, searchMode = searchMode, customRootDirectory = customDir).search())
+                            testList = testList + (Search(searchValue = searchValue, searchMode = searchMode, customRootDirectory = null).search())
                             searchValue = ""
                             endTime = System.nanoTime()
                             // Calculate elapsed time in seconds

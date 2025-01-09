@@ -1,4 +1,3 @@
-
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
@@ -15,16 +14,12 @@ fun main() = application {
         title = "FastFinder",
         state = windowState // Bind the window state (size, position) to the window
     ) {
-        // Check if the window is minimized
-        if (!windowState.isMinimized) {
-            // Dynamically adjust size if needed
-            windowState.size = androidx.compose.ui.unit.DpSize(1500.dp, 1500.dp)
-        }
-
         // Start index creation in a background thread
+        val dbManager = DBManager()
         Thread {
-            val dbManager = DBManager()
-            dbManager.createOrUpdateIndex(true) // Create or update the index in the background
+            synchronized(dbManager) {
+                dbManager.createOrUpdateIndex() // Create or update the index in the background
+            }
         }.start()
 
         // Call the FastFinderApp composable to display the main content

@@ -12,17 +12,23 @@ class Search(
     private val customRootDirectory: Any? = null, // Accept File or Directory
     private val dbManager: DBManager = DBManager()
 ) {
-    private val searcherManager: SearcherManager = if (customRootDirectory != null) {
+    private val searcherManager: SearcherManager
+
+    init {
+        // Determine which directory to use
         val directory = when (customRootDirectory) {
             is Directory -> customRootDirectory
             is File -> FSDirectory.open(Paths.get(customRootDirectory.toURI()))
-            else -> throw IllegalArgumentException("customRootDirectory must be either a Directory or a File")
+            null -> {
+                // Use the DBManager's current index directory
+                val currentIndexPath = dbManager.indexPath.toFile()
+                FSDirectory.open(currentIndexPath.toPath())
+            }
+            else -> throw IllegalArgumentException("customRootDirectory must be either a Directory, a File, or null")
         }
+
         val directoryReader = DirectoryReader.open(directory)
-        SearcherManager(directoryReader, null)
-    } else {
-        val indexWriter = dbManager.getIndexWriter()
-        SearcherManager(indexWriter, null)
+        searcherManager = SearcherManager(directoryReader, null)
     }
 
     /**
@@ -66,7 +72,8 @@ class Search(
                 booleanQuery.add(termQuery.build(), BooleanClause.Occur.MUST)
             }
 
-            val topDocs = searcher.search(booleanQuery.build(), Integer.MAX_VALUE)
+            // Use a reasonable limit for TopDocs instead of Integer.MAX_VALUE
+            val topDocs = searcher.search(booleanQuery.build(), 100) // Limit to 100 results
             for (scoreDoc in topDocs.scoreDocs) {
                 val doc = searcher.doc(scoreDoc.doc)
                 val itemName = doc.get("nameOriginal")

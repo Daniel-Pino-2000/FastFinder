@@ -1,4 +1,3 @@
-
 import org.apache.lucene.analysis.standard.StandardAnalyzer
 import org.apache.lucene.document.Document
 import org.apache.lucene.document.Field
@@ -15,6 +14,8 @@ import java.nio.file.attribute.BasicFileAttributes
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.thread
 import kotlin.io.AccessDeniedException
 
@@ -22,10 +23,10 @@ class DBManager(private val indexDirectoryName: String = "database") {
     private val analyzer = StandardAnalyzer()
     private var totalIndexed = 0
     val skippedPaths = mutableListOf<String>()
-    private val indexPath: Path
-    private val indexDirectoryPath: File = File("database/new_index_2025-01-08")
-    private val indexDirectory = FSDirectory.open(indexDirectoryPath.toPath())
+    val indexPath: Path
+    private var indexDirectory: FSDirectory
     private var indexWriter: IndexWriter? = null
+    private val lock = ReentrantLock()
 
     init {
         val currentDirectory = System.getProperty("user.dir")
@@ -34,31 +35,42 @@ class DBManager(private val indexDirectoryName: String = "database") {
         if (!Files.exists(indexPath)) {
             Files.createDirectories(indexPath)
         }
+        indexDirectory = FSDirectory.open(indexPath)
     }
 
     /**
-     * Get the shared IndexWriter instance.
+     * Get the shared IndexWriter instance (thread-safe).
      */
     fun getIndexWriter(): IndexWriter {
-        if (indexWriter == null) {
-            val config = IndexWriterConfig()
-            indexWriter = IndexWriter(indexDirectory, config)
+        lock.lock()
+        try {
+            if (indexWriter == null) {
+                val config = IndexWriterConfig(analyzer)
+                config.openMode = IndexWriterConfig.OpenMode.CREATE_OR_APPEND
+                indexWriter = IndexWriter(indexDirectory, config)
+            }
+            return indexWriter!!
+        } finally {
+            lock.unlock()
         }
-        return indexWriter!!
     }
 
     /**
-     * Commit and close the IndexWriter (if needed).
+     * Commit and close the IndexWriter (thread-safe).
      */
     fun closeWriter() {
-        indexWriter?.close()
-        indexWriter = null
+        lock.lock()
+        try {
+            indexWriter?.close()
+            indexWriter = null
+        } finally {
+            lock.unlock()
+        }
     }
 
     fun indexExists(): Boolean {
         return try {
-            DirectoryReader.open(indexDirectory)
-            true
+            DirectoryReader.open(indexDirectory).use { true }
         } catch (e: IOException) {
             false
         }
@@ -68,26 +80,27 @@ class DBManager(private val indexDirectoryName: String = "database") {
         val today = LocalDate.now().format(DateTimeFormatter.ISO_DATE)
         val lastModifiedDate = getLastModifiedDate()
 
-        // If forceIndexCreation is true, or the index doesn't exist or needs an update
         if (forceIndexCreation || !indexExists() || lastModifiedDate != today) {
-            // Perform indexing in a separate thread to allow searching in the old index.
             thread(start = true) {
-                val newIndexPath = indexPath.resolve("new_index_$today")
-                val newIndexDir = FSDirectory.open(newIndexPath)
-
-                val indexWriterConfig = IndexWriterConfig(analyzer)
-                IndexWriter(newIndexDir, indexWriterConfig).use { writer ->
-                    indexFilesAndDirectories(writer)
-                    writer.commit()
+                lock.lock()
+                try {
+                    val newIndexPath = indexPath.resolve("new_index_$today")
+                    FSDirectory.open(newIndexPath).use { newIndexDir ->
+                        val indexWriterConfig = IndexWriterConfig(analyzer)
+                        IndexWriter(newIndexDir, indexWriterConfig).use { writer ->
+                            indexFilesAndDirectories(writer)
+                            writer.commit()
+                        }
+                    }
+                    println("\nIndexing completed. Total items indexed: $totalIndexed")
+                    replaceOldIndexWithNew(newIndexPath)
+                } catch (e: Exception) {
+                    println("Error during indexing: ${e.message}")
+                } finally {
+                    lock.unlock()
                 }
-
-                println("\nIndexing completed. Total items indexed: $totalIndexed")
-                replaceOldIndexWithNew(newIndexPath)
             }
-
             println("Indexing process started in the background.")
-            println("You can search in the old index while the new one is being created.")
-
         } else {
             println("Index already exists and was created today, skipping indexing.")
         }
@@ -106,7 +119,6 @@ class DBManager(private val indexDirectoryName: String = "database") {
 
     private fun indexFilesAndDirectories(indexWriter: IndexWriter) {
         val roots = File.listRoots()
-
         val executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors())
 
         roots.forEach { root ->
@@ -158,7 +170,7 @@ class DBManager(private val indexDirectoryName: String = "database") {
 
         executor.shutdown()
         try {
-            if (!executor.awaitTermination(1, java.util.concurrent.TimeUnit.HOURS)) {
+            if (!executor.awaitTermination(1, TimeUnit.HOURS)) {
                 println("Timeout waiting for indexing tasks to complete.")
             }
         } catch (e: InterruptedException) {
@@ -198,17 +210,40 @@ class DBManager(private val indexDirectoryName: String = "database") {
     }
 
     private fun replaceOldIndexWithNew(newIndexPath: Path) {
-        // Rename the old index if exists
-        val oldIndexPath = indexPath.resolve("old_index")
-        val oldIndexDir = oldIndexPath.toFile()
-        if (oldIndexDir.exists()) {
-            oldIndexDir.deleteRecursively()
+        lock.lock()
+        try {
+            // Close the current writer and release resources
+            closeWriter()
+
+            // Delete the existing index directory
+            val oldIndexDir = indexPath.toFile()
+            if (oldIndexDir.exists()) {
+                oldIndexDir.deleteRecursively()
+            }
+
+            // Rename the new index directory to the default index directory
+            val newIndexDir = newIndexPath.toFile()
+            if (newIndexDir.renameTo(indexPath.toFile())) {
+                println("Old index successfully replaced with the new one.")
+            } else {
+                throw IOException("Failed to replace the old index with the new one.")
+            }
+
+            // Reinitialize the FSDirectory with the new index path
+            indexDirectory.close()
+            indexWriter = null
+            FSDirectory.open(indexPath).use { updatedDir ->
+                indexDirectory = updatedDir
+            }
+
+            // Reset the IndexWriter to point to the new database
+            getIndexWriter()
+        } catch (e: Exception) {
+            println("Error replacing old index with new: ${e.message}")
+            throw e
+        } finally {
+            lock.unlock()
         }
-
-        // Rename new index to default index
-        val newIndexDir = newIndexPath.toFile()
-        newIndexDir.renameTo(indexPath.toFile())
-        println("Old index replaced with the new one.")
     }
-}
 
+}
