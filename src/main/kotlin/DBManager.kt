@@ -27,6 +27,7 @@ class DBManager(private val indexDirectoryName: String = "database") {
     private var indexDirectory: FSDirectory
     private var indexWriter: IndexWriter? = null
     private val lock = ReentrantLock()
+    var isFirstIndexCreation = true  // Flag to track if it's the first index creation
 
     init {
         val currentDirectory = System.getProperty("user.dir")
@@ -94,6 +95,11 @@ class DBManager(private val indexDirectoryName: String = "database") {
                     }
                     println("\nIndexing completed. Total items indexed: $totalIndexed")
                     replaceOldIndexWithNew(newIndexPath)
+
+                    // After the first index creation, set the flag to false
+                    if (isFirstIndexCreation) {
+                        isFirstIndexCreation = false
+                    }
                 } catch (e: Exception) {
                     println("Error during indexing: ${e.message}")
                 } finally {
@@ -245,5 +251,4 @@ class DBManager(private val indexDirectoryName: String = "database") {
             lock.unlock()
         }
     }
-
 }

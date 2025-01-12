@@ -12,41 +12,62 @@ class Search(
     private val customRootDirectory: Any? = null, // Accept File or Directory
     private val dbManager: DBManager = DBManager()
 ) {
-    private val searcherManager: SearcherManager
+    private val searcherManager: SearcherManager?
 
     init {
-        // Determine which directory to use
-        val directory = when (customRootDirectory) {
-            is Directory -> customRootDirectory
-            is File -> FSDirectory.open(Paths.get(customRootDirectory.toURI()))
-            null -> {
-                // Use the DBManager's current index directory
-                val currentIndexPath = dbManager.indexPath.toFile()
-                FSDirectory.open(currentIndexPath.toPath())
+        // Check if the index is being created
+        if (dbManager.isFirstIndexCreation) {
+            // Prevent search if index is still being created
+            searcherManager = null
+        } else {
+            // Determine which directory to use
+            val directory = when (customRootDirectory) {
+                is Directory -> customRootDirectory
+                is File -> FSDirectory.open(Paths.get(customRootDirectory.toURI()))
+                null -> {
+                    // Use the DBManager's current index directory
+                    val currentIndexPath = dbManager.indexPath.toFile()
+                    FSDirectory.open(currentIndexPath.toPath())
+                }
+                else -> throw IllegalArgumentException("customRootDirectory must be either a Directory, a File, or null")
             }
-            else -> throw IllegalArgumentException("customRootDirectory must be either a Directory, a File, or null")
-        }
 
-        val directoryReader = DirectoryReader.open(directory)
-        searcherManager = SearcherManager(directoryReader, null)
+            val directoryReader = DirectoryReader.open(directory)
+            searcherManager = SearcherManager(directoryReader, null)
+        }
     }
 
     /**
-     * Perform the search.
+     * Perform the search if the index is ready, else show a message indicating the index is still being created.
      */
     fun search(): List<SystemItem> {
-        return try {
-            // Ensure the index is up-to-date
-            searcherManager.maybeRefresh()
-
-            val results = performSearch()
-            println("Search completed. Found ${results.size} results")
-            results
-        } catch (e: Exception) {
-            println("Error during search: ${e.message}")
-            e.printStackTrace()
+        return if (dbManager.isFirstIndexCreation) {
+            // Show a message that the index is being created
+            showIndexCreationMessage()
             emptyList()
+        } else {
+            try {
+                // Ensure the index is up-to-date
+                searcherManager?.maybeRefresh()
+
+                val results = performSearch()
+                println("Search completed. Found ${results.size} results")
+                results
+            } catch (e: Exception) {
+                println("Error during search: ${e.message}")
+                e.printStackTrace()
+                emptyList()
+            }
         }
+    }
+
+    /**
+     * Show a message (toast or window) informing that the index is currently being created.
+     */
+    private fun showIndexCreationMessage() {
+        // Here, you can implement a Toast or a window message to notify the user.
+        println("The database is currently being created. Please wait until indexing is complete.")
+        println("You can perform a custom search instead.")
     }
 
     /**
@@ -57,7 +78,7 @@ class Search(
         val foundItems = mutableListOf<SystemItem>()
 
         // Acquire the searcher
-        val searcher: IndexSearcher = searcherManager.acquire()
+        val searcher: IndexSearcher = searcherManager!!.acquire()
         try {
             val booleanQuery = BooleanQuery.Builder()
 
@@ -90,7 +111,7 @@ class Search(
             }
         } finally {
             // Release the searcher after use
-            searcherManager.release(searcher)
+            searcherManager?.release(searcher)
         }
         return foundItems
     }
