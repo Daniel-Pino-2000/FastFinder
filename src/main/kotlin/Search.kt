@@ -1,3 +1,4 @@
+
 import org.apache.lucene.index.DirectoryReader
 import org.apache.lucene.index.Term
 import org.apache.lucene.search.*
@@ -5,6 +6,7 @@ import org.apache.lucene.store.Directory
 import org.apache.lucene.store.FSDirectory
 import java.io.File
 import java.nio.file.Paths
+import javax.swing.JOptionPane
 
 class Search(
     private val searchValue: String,
@@ -62,12 +64,17 @@ class Search(
     }
 
     /**
-     * Show a message (toast or window) informing that the index is currently being created.
+     * Show a message (pop-up dialog) informing that the index is currently being created.
      */
     private fun showIndexCreationMessage() {
-        // Here, you can implement a Toast or a window message to notify the user.
-        println("The database is currently being created. Please wait until indexing is complete.")
-        println("You can perform a custom search instead.")
+        // Pop-up dialog to notify the user that the index is still being created
+        JOptionPane.showMessageDialog(
+            null,
+            "The database is currently being created. Please wait until indexing is complete.\n" +
+                    "You can perform a custom search instead.",
+            "Index Creation In Progress",
+            JOptionPane.INFORMATION_MESSAGE
+        )
     }
 
     /**
