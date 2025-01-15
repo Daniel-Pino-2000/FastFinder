@@ -1,11 +1,9 @@
-
 import org.apache.lucene.index.DirectoryReader
 import org.apache.lucene.index.Term
 import org.apache.lucene.search.*
 import org.apache.lucene.store.Directory
 import org.apache.lucene.store.FSDirectory
 import java.io.File
-import java.nio.file.Paths
 import javax.swing.JOptionPane
 
 class Search(
@@ -25,15 +23,24 @@ class Search(
             // Determine which directory to use
             val directory = when (customRootDirectory) {
                 is Directory -> customRootDirectory
-                is File -> FSDirectory.open(Paths.get(customRootDirectory.toURI()))
+                is File -> {
+                    if (!customRootDirectory.exists() || !customRootDirectory.isDirectory) {
+                        throw IllegalArgumentException("${customRootDirectory.absolutePath} is not a valid directory")
+                    }
+                    FSDirectory.open(customRootDirectory.toPath())
+                }
                 null -> {
                     // Use the DBManager's current index directory
                     val currentIndexPath = dbManager.indexPath.toFile()
+                    if (!currentIndexPath.exists() || !currentIndexPath.isDirectory) {
+                        throw IllegalStateException("Default index path ${currentIndexPath.absolutePath} is invalid")
+                    }
                     FSDirectory.open(currentIndexPath.toPath())
                 }
                 else -> throw IllegalArgumentException("customRootDirectory must be either a Directory, a File, or null")
             }
 
+            // Initialize SearcherManager
             val directoryReader = DirectoryReader.open(directory)
             searcherManager = SearcherManager(directoryReader, null)
         }
