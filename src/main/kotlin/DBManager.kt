@@ -11,8 +11,6 @@ import java.io.File
 import java.io.IOException
 import java.nio.file.*
 import java.nio.file.attribute.BasicFileAttributes
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
@@ -27,22 +25,38 @@ class DBManager(private val indexDirectoryName: String = "database") {
     private var indexDirectory: FSDirectory
     private var indexWriter: IndexWriter? = null
     private val lock = ReentrantLock()
-    var isFirstIndexCreation = true  // Flag to track if it's the first index creation
+    private val stateFilePath: Path
+
+    // Flag to track if it's the first index creation
+    var isFirstIndexCreation: Boolean
 
     init {
         val currentDirectory = System.getProperty("user.dir")
         indexPath = Paths.get(currentDirectory, indexDirectoryName)
+        stateFilePath = indexPath.resolve("index_state.txt")
 
         if (!Files.exists(indexPath)) {
             Files.createDirectories(indexPath)
         }
+
         indexDirectory = FSDirectory.open(indexPath)
+        isFirstIndexCreation = readIsFirstIndexCreation()
+        println("Is first index creation: $isFirstIndexCreation")
     }
 
-    /**
-     * Get the shared IndexWriter instance (thread-safe).
-     */
-    fun getIndexWriter(): IndexWriter {
+    private fun readIsFirstIndexCreation(): Boolean {
+        return if (Files.exists(stateFilePath)) {
+            Files.readAllLines(stateFilePath).firstOrNull()?.toBoolean() ?: true
+        } else {
+            true
+        }
+    }
+
+    private fun saveIsFirstIndexCreation() {
+        Files.write(stateFilePath, listOf(isFirstIndexCreation.toString()), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
+    }
+
+    private fun getIndexWriter(): IndexWriter {
         lock.lock()
         try {
             if (indexWriter == null) {
@@ -56,10 +70,7 @@ class DBManager(private val indexDirectoryName: String = "database") {
         }
     }
 
-    /**
-     * Commit and close the IndexWriter (thread-safe).
-     */
-    fun closeWriter() {
+    private fun closeWriter() {
         lock.lock()
         try {
             indexWriter?.close()
@@ -69,7 +80,7 @@ class DBManager(private val indexDirectoryName: String = "database") {
         }
     }
 
-    fun indexExists(): Boolean {
+    private fun indexExists(): Boolean {
         return try {
             DirectoryReader.open(indexDirectory).use { true }
         } catch (e: IOException) {
@@ -78,14 +89,12 @@ class DBManager(private val indexDirectoryName: String = "database") {
     }
 
     fun createOrUpdateIndex(forceIndexCreation: Boolean = false) {
-        val today = LocalDate.now().format(DateTimeFormatter.ISO_DATE)
-        val lastModifiedDate = getLastModifiedDate()
-
-        if (forceIndexCreation || !indexExists() || lastModifiedDate != today) {
+        println("Checking if index exists before updating or creating in the background: ${indexExists()}")
+        if (forceIndexCreation || isFirstIndexCreation || !indexExists()) {
             thread(start = true) {
                 lock.lock()
                 try {
-                    val newIndexPath = indexPath.resolve("new_index_$today")
+                    val newIndexPath = indexPath.resolve("new_index")
                     FSDirectory.open(newIndexPath).use { newIndexDir ->
                         val indexWriterConfig = IndexWriterConfig(analyzer)
                         IndexWriter(newIndexDir, indexWriterConfig).use { writer ->
@@ -96,9 +105,10 @@ class DBManager(private val indexDirectoryName: String = "database") {
                     println("\nIndexing completed. Total items indexed: $totalIndexed")
                     replaceOldIndexWithNew(newIndexPath)
 
-                    // After the first index creation, set the flag to false
                     if (isFirstIndexCreation) {
+                        println("Setting isFirstIndexCreation to false.")
                         isFirstIndexCreation = false
+                        saveIsFirstIndexCreation()
                     }
                 } catch (e: Exception) {
                     println("Error during indexing: ${e.message}")
@@ -108,18 +118,7 @@ class DBManager(private val indexDirectoryName: String = "database") {
             }
             println("Indexing process started in the background.")
         } else {
-            println("Index already exists and was created today, skipping indexing.")
-        }
-    }
-
-    private fun getLastModifiedDate(): String {
-        val directoryFile = indexPath.toFile()
-        return if (directoryFile.exists()) {
-            val lastModifiedMillis = directoryFile.lastModified()
-            val lastModifiedDate = LocalDate.ofEpochDay(lastModifiedMillis / (24 * 60 * 60 * 1000))
-            lastModifiedDate.format(DateTimeFormatter.ISO_DATE)
-        } else {
-            ""
+            println("Index already exists. Skipping indexing.")
         }
     }
 
@@ -218,16 +217,12 @@ class DBManager(private val indexDirectoryName: String = "database") {
     private fun replaceOldIndexWithNew(newIndexPath: Path) {
         lock.lock()
         try {
-            // Close the current writer and release resources
             closeWriter()
-
-            // Delete the existing index directory
             val oldIndexDir = indexPath.toFile()
             if (oldIndexDir.exists()) {
                 oldIndexDir.deleteRecursively()
             }
 
-            // Rename the new index directory to the default index directory
             val newIndexDir = newIndexPath.toFile()
             if (newIndexDir.renameTo(indexPath.toFile())) {
                 println("Old index successfully replaced with the new one.")
@@ -235,14 +230,11 @@ class DBManager(private val indexDirectoryName: String = "database") {
                 throw IOException("Failed to replace the old index with the new one.")
             }
 
-            // Reinitialize the FSDirectory with the new index path
             indexDirectory.close()
             indexWriter = null
             FSDirectory.open(indexPath).use { updatedDir ->
                 indexDirectory = updatedDir
             }
-
-            // Reset the IndexWriter to point to the new database
             getIndexWriter()
         } catch (e: Exception) {
             println("Error replacing old index with new: ${e.message}")

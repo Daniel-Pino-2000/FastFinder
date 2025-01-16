@@ -31,6 +31,7 @@ class Search(
                 }
                 null -> {
                     // Use the DBManager's current index directory
+                    println("It is using the DBManager directory")
                     val currentIndexPath = dbManager.indexPath.toFile()
                     if (!currentIndexPath.exists() || !currentIndexPath.isDirectory) {
                         throw IllegalStateException("Default index path ${currentIndexPath.absolutePath} is invalid")
