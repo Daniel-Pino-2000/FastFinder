@@ -1,0 +1,2 @@
+false
+D:\Programacion\Mis programas\Kotlin\FastFinder\FastFinder\database

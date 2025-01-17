@@ -40,20 +40,32 @@ class DBManager(private val indexDirectoryName: String = "database") {
         }
 
         indexDirectory = FSDirectory.open(indexPath)
-        isFirstIndexCreation = readIsFirstIndexCreation()
+        isFirstIndexCreation = readStateFile()
         println("Is first index creation: $isFirstIndexCreation")
     }
 
-    private fun readIsFirstIndexCreation(): Boolean {
+    private fun readStateFile(): Boolean {
         return if (Files.exists(stateFilePath)) {
-            Files.readAllLines(stateFilePath).firstOrNull()?.toBoolean() ?: true
+            try {
+                val lines = Files.readAllLines(stateFilePath)
+                lines.getOrNull(0)?.toBoolean() ?: true
+            } catch (e: IOException) {
+                println("Error reading state file: ${e.message}")
+                true
+            }
         } else {
             true
         }
     }
 
-    private fun saveIsFirstIndexCreation() {
-        Files.write(stateFilePath, listOf(isFirstIndexCreation.toString()), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
+    private fun writeStateFile() {
+        try {
+            // Save the state of index creation along with the index path
+            Files.write(stateFilePath, listOf(isFirstIndexCreation.toString(), indexPath.toString()),
+                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
+        } catch (e: IOException) {
+            println("Error writing state file: ${e.message}")
+        }
     }
 
     private fun getIndexWriter(): IndexWriter {
@@ -89,11 +101,12 @@ class DBManager(private val indexDirectoryName: String = "database") {
     }
 
     fun createOrUpdateIndex(forceIndexCreation: Boolean = false) {
-        println("Checking if index exists before updating or creating in the background: ${indexExists()}")
+        println("Checking if index exists before updating or creating: ${indexExists()}")
         if (forceIndexCreation || isFirstIndexCreation || !indexExists()) {
             thread(start = true) {
                 lock.lock()
                 try {
+                    println("Starting indexing process...")
                     val newIndexPath = indexPath.resolve("new_index")
                     FSDirectory.open(newIndexPath).use { newIndexDir ->
                         val indexWriterConfig = IndexWriterConfig(analyzer)
@@ -108,7 +121,7 @@ class DBManager(private val indexDirectoryName: String = "database") {
                     if (isFirstIndexCreation) {
                         println("Setting isFirstIndexCreation to false.")
                         isFirstIndexCreation = false
-                        saveIsFirstIndexCreation()
+                        writeStateFile()
                     }
                 } catch (e: Exception) {
                     println("Error during indexing: ${e.message}")
@@ -123,7 +136,9 @@ class DBManager(private val indexDirectoryName: String = "database") {
     }
 
     private fun indexFilesAndDirectories(indexWriter: IndexWriter) {
-        val roots = File.listRoots()
+        // val roots = File.listRoots()
+        val roots = listOf(File("D:\\Daniel"))
+
         val executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors())
 
         roots.forEach { root ->
@@ -217,30 +232,82 @@ class DBManager(private val indexDirectoryName: String = "database") {
     private fun replaceOldIndexWithNew(newIndexPath: Path) {
         lock.lock()
         try {
-            closeWriter()
-            val oldIndexDir = indexPath.toFile()
-            if (oldIndexDir.exists()) {
-                oldIndexDir.deleteRecursively()
-            }
+            closeWriter() // Ensure no writer is active
+            println("Finalizing index creation...")
 
+            // Reinitialize index paths
             val newIndexDir = newIndexPath.toFile()
-            if (newIndexDir.renameTo(indexPath.toFile())) {
-                println("Old index successfully replaced with the new one.")
+            val oldIndexDir = indexPath.toFile()
+
+            if (isFirstIndexCreation) {
+                println("First index creation. Moving new index to the main directory.")
+                try {
+                    Files.move(newIndexPath, indexPath, StandardCopyOption.REPLACE_EXISTING)
+                    println("Index successfully created at ${indexPath.toAbsolutePath()}.")
+                } catch (e: IOException) {
+                    println("Failed to move new index to the main index path: ${e.message}")
+                    println("Attempting to copy instead...")
+                    copyDirectory(newIndexPath, indexPath)
+                }
             } else {
-                throw IOException("Failed to replace the old index with the new one.")
+                // Handle replacing old index
+                if (oldIndexDir.exists()) {
+                    println("Deleting old index directory: ${oldIndexDir.absolutePath}")
+                    if (!deleteDirectory(oldIndexDir)) {
+                        throw IOException("Failed to delete the old index directory.")
+                    }
+                }
+
+                println("Renaming new index directory: ${newIndexDir.absolutePath} to ${indexPath.toAbsolutePath()}")
+                try {
+                    Files.move(newIndexPath, indexPath, StandardCopyOption.ATOMIC_MOVE)
+                    println("Old index successfully replaced with the new one.")
+                } catch (e: IOException) {
+                    println("Failed to move new index to the main index path: ${e.message}")
+                    println("Attempting to copy instead...")
+                    copyDirectory(newIndexPath, indexPath)
+                }
             }
 
+            // Reinitialize the index directory for future use
             indexDirectory.close()
             indexWriter = null
-            FSDirectory.open(indexPath).use { updatedDir ->
-                indexDirectory = updatedDir
-            }
+            indexDirectory = FSDirectory.open(indexPath)
             getIndexWriter()
+
+            println("Index replacement completed.")
         } catch (e: Exception) {
-            println("Error replacing old index with new: ${e.message}")
-            throw e
+            println("Error finalizing index creation: ${e.message}")
         } finally {
             lock.unlock()
         }
     }
+
+    /**
+     * Copies the contents of a directory recursively.
+     */
+    private fun copyDirectory(source: Path, target: Path) {
+        try {
+            Files.walk(source).forEach { file ->
+                val destination = target.resolve(source.relativize(file))
+                if (Files.isDirectory(file)) {
+                    if (!Files.exists(destination)) Files.createDirectories(destination)
+                } else {
+                    Files.copy(file, destination, StandardCopyOption.REPLACE_EXISTING)
+                }
+            }
+            println("Directory successfully copied from $source to $target.")
+        } catch (e: IOException) {
+            throw IOException("Failed to copy directory from $source to $target: ${e.message}")
+        }
+    }
+
+    /**
+     * Deletes a directory and its contents recursively.
+     */
+    private fun deleteDirectory(directory: File): Boolean {
+        return directory.walkBottomUp().all { it.delete() }
+    }
+
+
 }
