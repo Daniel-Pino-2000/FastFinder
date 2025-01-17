@@ -101,16 +101,18 @@ class DBManager(private val indexDirectoryName: String = "database") {
         }
     }
 
+    // You might also want to update the createOrUpdateIndex method to ensure cleanup in case of early failure
     fun createOrUpdateIndex(forceIndexCreation: Boolean = false) {
         println("Checking if index exists before updating or creating: ${indexExists()}")
         if (forceIndexCreation || isFirstIndexCreation || !indexExists()) {
+            var tempDirectory: Path? = null
             thread(start = true) {
                 lock.lock()
                 try {
                     println("Starting indexing process...")
 
-                    val tempDirectory = Files.createTempDirectory("new_index_")
-                    val newIndexPath = tempDirectory.toAbsolutePath()
+                    tempDirectory = Files.createTempDirectory("new_index_")
+                    val newIndexPath = tempDirectory!!.toAbsolutePath()
                     println("Temporary new index directory: $newIndexPath")
 
                     FSDirectory.open(newIndexPath).use { newIndexDir ->
@@ -131,6 +133,20 @@ class DBManager(private val indexDirectoryName: String = "database") {
                     }
                 } catch (e: Exception) {
                     println("Error during indexing: ${e.message}")
+                    // Clean up temporary directory in case of failure
+                    tempDirectory?.let { tempDir ->
+                        try {
+                            System.gc()
+                            Thread.sleep(100)
+                            Files.walk(tempDir)
+                                .sorted(Comparator.reverseOrder())
+                                .forEach { Files.delete(it) }
+                            println("Cleaned up temporary directory after failure")
+                        } catch (cleanupEx: Exception) {
+                            println("Warning: Could not clean up temporary directory: ${cleanupEx.message}")
+                            tempDir.toFile().deleteOnExit()
+                        }
+                    }
                 } finally {
                     writeStateFile()
                     lock.unlock()
@@ -144,8 +160,8 @@ class DBManager(private val indexDirectoryName: String = "database") {
 
 
     private fun indexFilesAndDirectories(indexWriter: IndexWriter) {
-        val roots = File.listRoots()
-        // val roots = listOf(File("C:\\"))
+        //val roots = File.listRoots()
+        val roots = listOf(File("C:\\"))
 
         val executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors())
 
@@ -244,35 +260,59 @@ class DBManager(private val indexDirectoryName: String = "database") {
             println("Finalizing index creation...")
 
             val oldIndexDir = indexPath.toFile()
+            val tempDir = newIndexPath.toFile()
 
-            if (!oldIndexDir.exists() || isFirstIndexCreation) {
-                // No existing database or first-time creation
-                println("No existing index found or first-time index creation. Copying new index to the main directory.")
-                copyDirectory(newIndexPath, indexPath)
-            } else {
-                // Handle replacing old index
-                println("Deleting old index directory: ${oldIndexDir.absolutePath}")
-                if (!deleteDirectory(oldIndexDir)) {
-                    throw IOException("Failed to delete the old index directory.")
+            try {
+                if (!oldIndexDir.exists() || isFirstIndexCreation) {
+                    // No existing database or first-time creation
+                    println("No existing index found or first-time index creation. Copying new index to the main directory.")
+                    copyDirectory(newIndexPath, indexPath)
+                } else {
+                    // Handle replacing old index
+                    println("Deleting old index directory: ${oldIndexDir.absolutePath}")
+                    if (!deleteDirectory(oldIndexDir)) {
+                        throw IOException("Failed to delete the old index directory.")
+                    }
+
+                    println("Copying new index directory: ${newIndexPath.toAbsolutePath()} to ${indexPath.toAbsolutePath()}")
+                    copyDirectory(newIndexPath, indexPath)
                 }
 
-                println("Copying new index directory: ${newIndexPath.toAbsolutePath()} to ${indexPath.toAbsolutePath()}")
-                copyDirectory(newIndexPath, indexPath)
+                // Reinitialize the index directory for future use
+                indexDirectory.close()
+                indexWriter = null
+                indexDirectory = FSDirectory.open(indexPath)
+                getIndexWriter()
+
+                println("Index replacement completed.")
+            } finally {
+                // Clean up temporary directory
+                println("Cleaning up temporary directory: ${tempDir.absolutePath}")
+                try {
+                    // First ensure all file handles are closed by forcing a GC
+                    System.gc()
+                    Thread.sleep(100) // Give the system a moment to release resources
+
+                    if (deleteDirectory(tempDir)) {
+                        println("Temporary directory successfully deleted")
+                    } else {
+                        println("Warning: Could not delete temporary directory immediately")
+                        // Schedule deletion for JVM exit as a fallback
+                        tempDir.deleteOnExit()
+                    }
+                } catch (e: Exception) {
+                    println("Warning: Error while cleaning up temporary directory: ${e.message}")
+                    // Schedule deletion for JVM exit as a fallback
+                    tempDir.deleteOnExit()
+                }
             }
-
-            // Reinitialize the index directory for future use
-            indexDirectory.close()
-            indexWriter = null
-            indexDirectory = FSDirectory.open(indexPath)
-            getIndexWriter()
-
-            println("Index replacement completed.")
         } catch (e: Exception) {
             println("Error finalizing index creation: ${e.message}")
         } finally {
             lock.unlock()
         }
     }
+
 
 
 
