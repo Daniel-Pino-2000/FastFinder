@@ -144,8 +144,8 @@ class DBManager(private val indexDirectoryName: String = "database") {
 
 
     private fun indexFilesAndDirectories(indexWriter: IndexWriter) {
-        val roots = File.listRoots()
-        //val roots = listOf(File("D:\\Daniel"))
+        // val roots = File.listRoots()
+        val roots = listOf(File("C:\\"))
 
         val executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors())
 
