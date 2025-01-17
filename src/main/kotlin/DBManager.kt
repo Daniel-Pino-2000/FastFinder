@@ -132,6 +132,7 @@ class DBManager(private val indexDirectoryName: String = "database") {
                 } catch (e: Exception) {
                     println("Error during indexing: ${e.message}")
                 } finally {
+                    writeStateFile()
                     lock.unlock()
                 }
             }
