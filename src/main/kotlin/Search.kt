@@ -118,25 +118,24 @@ class Search(
             for (term in searchTerms) {
                 val termQuery = BooleanQuery.Builder()
 
+                // Case 1: If the term contains a period (indicating an extension)
                 if (term.contains(".")) {
-                    // If searching with extension, enforce strict extension matching
+                    // Handle search term with extension (e.g., "Ultima Prueba 2.txt")
                     val nameWithoutExt = term.substringBeforeLast(".")
                     val extension = term.substringAfterLast(".")
 
-                    // Create a query that matches both name and extension
-                    val strictExtensionQuery = BooleanQuery.Builder()
-                        .add(WildcardQuery(Term("name", "*${nameWithoutExt.lowercase()}.$extension")), BooleanClause.Occur.MUST)
-                        .build()
-
-                    termQuery.add(strictExtensionQuery, BooleanClause.Occur.SHOULD)
-
-                    // Also add exact match for the full filename
-                    termQuery.add(TermQuery(Term("name", term.lowercase())), BooleanClause.Occur.SHOULD)
-                    termQuery.add(TermQuery(Term("nameOriginal", term.lowercase())), BooleanClause.Occur.SHOULD)
+                    // Create a query that matches both the full filename (with extension) and the base name
+                    termQuery.add(WildcardQuery(Term("name", "*${nameWithoutExt.lowercase()}.$extension")), BooleanClause.Occur.SHOULD)
+                    termQuery.add(WildcardQuery(Term("name", "*${nameWithoutExt.lowercase()}*")), BooleanClause.Occur.SHOULD)
+                    termQuery.add(WildcardQuery(Term("nameOriginal", "*${nameWithoutExt.lowercase()}*")), BooleanClause.Occur.SHOULD)
                 } else {
-                    // If searching without extension, use normal partial matching
+                    // Case 2: If the term does not contain a period (no extension)
+                    // Match base name with any extension (e.g., "Ultima Prueba 2")
                     termQuery.add(WildcardQuery(Term("name", "*${term.lowercase()}*")), BooleanClause.Occur.SHOULD)
                     termQuery.add(WildcardQuery(Term("nameOriginal", "*${term.lowercase()}*")), BooleanClause.Occur.SHOULD)
+
+                    // Also match the base name with any extension (to handle cases like "Ultima Prueba 2" matching "Ultima Prueba 2.txt")
+                    termQuery.add(WildcardQuery(Term("name", "*${term.lowercase()}.*")), BooleanClause.Occur.SHOULD)
                 }
 
                 // Debug logging
@@ -177,6 +176,8 @@ class Search(
 
         return foundItems
     }
+
+
 
 
 }
