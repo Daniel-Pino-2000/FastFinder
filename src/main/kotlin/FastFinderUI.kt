@@ -77,7 +77,7 @@ fun FastFinderApp() {
                             if (event.type == KeyEventType.KeyUp && event.key == Key.Enter) {
                                 startTime = System.nanoTime()
                                 testList = emptyList()
-                                testList = testList + (Search(searchValue = searchValue, searchMode = searchMode, customRootDirectory = customDir).search())
+                                testList = testList + (Search(searchValue = searchValue, searchMode = searchMode, customRootDirectory = null).search())
                                 searchValue = "" // Clear search after adding
                                 endTime = System.nanoTime()
                                 // Calculate elapsed time in seconds

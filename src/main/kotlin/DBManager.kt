@@ -42,6 +42,7 @@ class DBManager(private val indexDirectoryName: String = "database") {
         indexDirectory = FSDirectory.open(indexPath)
         isFirstIndexCreation = readStateFile()
         println("Is first index creation: $isFirstIndexCreation")
+        println("IndexPath: $indexPath")
     }
 
     private fun readStateFile(): Boolean {
@@ -107,7 +108,11 @@ class DBManager(private val indexDirectoryName: String = "database") {
                 lock.lock()
                 try {
                     println("Starting indexing process...")
-                    val newIndexPath = indexPath.resolve("new_index")
+
+                    val tempDirectory = Files.createTempDirectory("new_index_")
+                    val newIndexPath = tempDirectory.toAbsolutePath()
+                    println("Temporary new index directory: $newIndexPath")
+
                     FSDirectory.open(newIndexPath).use { newIndexDir ->
                         val indexWriterConfig = IndexWriterConfig(analyzer)
                         IndexWriter(newIndexDir, indexWriterConfig).use { writer ->
@@ -115,6 +120,7 @@ class DBManager(private val indexDirectoryName: String = "database") {
                             writer.commit()
                         }
                     }
+
                     println("\nIndexing completed. Total items indexed: $totalIndexed")
                     replaceOldIndexWithNew(newIndexPath)
 
@@ -135,8 +141,9 @@ class DBManager(private val indexDirectoryName: String = "database") {
         }
     }
 
+
     private fun indexFilesAndDirectories(indexWriter: IndexWriter) {
-        // val roots = File.listRoots()
+        //val roots = File.listRoots()
         val roots = listOf(File("D:\\Daniel"))
 
         val executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors())
@@ -235,38 +242,21 @@ class DBManager(private val indexDirectoryName: String = "database") {
             closeWriter() // Ensure no writer is active
             println("Finalizing index creation...")
 
-            // Reinitialize index paths
-            val newIndexDir = newIndexPath.toFile()
             val oldIndexDir = indexPath.toFile()
 
-            if (isFirstIndexCreation) {
-                println("First index creation. Moving new index to the main directory.")
-                try {
-                    Files.move(newIndexPath, indexPath, StandardCopyOption.REPLACE_EXISTING)
-                    println("Index successfully created at ${indexPath.toAbsolutePath()}.")
-                } catch (e: IOException) {
-                    println("Failed to move new index to the main index path: ${e.message}")
-                    println("Attempting to copy instead...")
-                    copyDirectory(newIndexPath, indexPath)
-                }
+            if (!oldIndexDir.exists() || isFirstIndexCreation) {
+                // No existing database or first-time creation
+                println("No existing index found or first-time index creation. Copying new index to the main directory.")
+                copyDirectory(newIndexPath, indexPath)
             } else {
                 // Handle replacing old index
-                if (oldIndexDir.exists()) {
-                    println("Deleting old index directory: ${oldIndexDir.absolutePath}")
-                    if (!deleteDirectory(oldIndexDir)) {
-                        throw IOException("Failed to delete the old index directory.")
-                    }
+                println("Deleting old index directory: ${oldIndexDir.absolutePath}")
+                if (!deleteDirectory(oldIndexDir)) {
+                    throw IOException("Failed to delete the old index directory.")
                 }
 
-                println("Renaming new index directory: ${newIndexDir.absolutePath} to ${indexPath.toAbsolutePath()}")
-                try {
-                    Files.move(newIndexPath, indexPath, StandardCopyOption.ATOMIC_MOVE)
-                    println("Old index successfully replaced with the new one.")
-                } catch (e: IOException) {
-                    println("Failed to move new index to the main index path: ${e.message}")
-                    println("Attempting to copy instead...")
-                    copyDirectory(newIndexPath, indexPath)
-                }
+                println("Copying new index directory: ${newIndexPath.toAbsolutePath()} to ${indexPath.toAbsolutePath()}")
+                copyDirectory(newIndexPath, indexPath)
             }
 
             // Reinitialize the index directory for future use
@@ -282,6 +272,8 @@ class DBManager(private val indexDirectoryName: String = "database") {
             lock.unlock()
         }
     }
+
+
 
     /**
      * Copies the contents of a directory recursively.
