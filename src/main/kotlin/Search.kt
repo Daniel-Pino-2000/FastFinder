@@ -118,27 +118,30 @@ class Search(
             for (term in searchTerms) {
                 val termQuery = BooleanQuery.Builder()
 
-                // Add exact match queries (case-insensitive)
-                termQuery.add(TermQuery(Term("name", term.lowercase())), BooleanClause.Occur.SHOULD)
-                termQuery.add(TermQuery(Term("nameOriginal", term.lowercase())), BooleanClause.Occur.SHOULD)
-
-                // Add contains queries
-                termQuery.add(WildcardQuery(Term("name", "*${term.lowercase()}*")), BooleanClause.Occur.SHOULD)
-                termQuery.add(WildcardQuery(Term("nameOriginal", "*${term.lowercase()}*")), BooleanClause.Occur.SHOULD)
-
-                // If the term has an extension, also search for the name part separately
                 if (term.contains(".")) {
+                    // If searching with extension, enforce strict extension matching
                     val nameWithoutExt = term.substringBeforeLast(".")
-                    termQuery.add(WildcardQuery(Term("name", "*${nameWithoutExt.lowercase()}*")), BooleanClause.Occur.SHOULD)
-                    termQuery.add(WildcardQuery(Term("nameOriginal", "*${nameWithoutExt.lowercase()}*")), BooleanClause.Occur.SHOULD)
+                    val extension = term.substringAfterLast(".")
+
+                    // Create a query that matches both name and extension
+                    val strictExtensionQuery = BooleanQuery.Builder()
+                        .add(WildcardQuery(Term("name", "*${nameWithoutExt.lowercase()}.$extension")), BooleanClause.Occur.MUST)
+                        .build()
+
+                    termQuery.add(strictExtensionQuery, BooleanClause.Occur.SHOULD)
+
+                    // Also add exact match for the full filename
+                    termQuery.add(TermQuery(Term("name", term.lowercase())), BooleanClause.Occur.SHOULD)
+                    termQuery.add(TermQuery(Term("nameOriginal", term.lowercase())), BooleanClause.Occur.SHOULD)
+                } else {
+                    // If searching without extension, use normal partial matching
+                    termQuery.add(WildcardQuery(Term("name", "*${term.lowercase()}*")), BooleanClause.Occur.SHOULD)
+                    termQuery.add(WildcardQuery(Term("nameOriginal", "*${term.lowercase()}*")), BooleanClause.Occur.SHOULD)
                 }
 
-                // Debug logging for term analysis
+                // Debug logging
                 println("Processing term: '$term'")
-                println("Term lowercase: '${term.lowercase()}'")
-                if (term.contains(".")) {
-                    println("Name without extension: '${term.substringBeforeLast(".")}'")
-                }
+                println("Query for term: ${termQuery.build()}")
 
                 booleanQuery.add(termQuery.build(), BooleanClause.Occur.MUST)
             }
@@ -148,15 +151,6 @@ class Search(
 
             val topDocs = searcher.search(finalQuery, Integer.MAX_VALUE)
             println("Found ${topDocs.totalHits} matching documents")
-
-            // Debug: Print all indexed documents
-            println("DEBUG: Listing all indexed documents:")
-            val allDocsQuery = MatchAllDocsQuery()
-            val allDocs = searcher.search(allDocsQuery, 1000)
-            for (scoreDoc in allDocs.scoreDocs) {
-                val doc = searcher.doc(scoreDoc.doc)
-                println("Indexed doc: name=${doc.get("name")}, nameOriginal=${doc.get("nameOriginal")}, path=${doc.get("path")}")
-            }
 
             for (scoreDoc in topDocs.scoreDocs) {
                 val doc = searcher.doc(scoreDoc.doc)
