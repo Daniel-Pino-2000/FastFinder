@@ -1,3 +1,4 @@
+
 import org.apache.lucene.index.Term
 import org.apache.lucene.search.*
 import org.apache.lucene.store.Directory
@@ -114,29 +115,58 @@ class Search(
             val booleanQuery = BooleanQuery.Builder()
             println("Building query...")
 
+            // Process each search term
             for (term in searchTerms) {
-                val termQuery = BooleanQuery.Builder()
-                termQuery.add(WildcardQuery(Term("name", "*${term}*")), BooleanClause.Occur.SHOULD)
-                termQuery.add(WildcardQuery(Term("nameOriginal", "*${term}*")), BooleanClause.Occur.SHOULD)
-                booleanQuery.add(termQuery.build(), BooleanClause.Occur.MUST)
+                // Ensure wildcard queries are correctly created for matching parts of the name
+                val wildcardQueryName = WildcardQuery(Term("name", "*${term}*"))
+                val wildcardQueryNameOriginal = WildcardQuery(Term("nameOriginal", "*${term}*"))
+
+                // Handle name without extensions: this logic assumes a single extension
+                val termWithoutExtension = term.substringBeforeLast(".")
+                val wildcardQueryNameNoExtension = WildcardQuery(Term("name", "*$termWithoutExtension*"))
+                val wildcardQueryNameOriginalNoExtension = WildcardQuery(Term("nameOriginal", "*$termWithoutExtension*"))
+
+                // Log the terms and queries to verify construction
+                println("Adding wildcard queries for term '$term'")
+
+                // Add wildcard queries for both full name and name without extension
+                booleanQuery.add(wildcardQueryName, BooleanClause.Occur.SHOULD)
+                booleanQuery.add(wildcardQueryNameOriginal, BooleanClause.Occur.SHOULD)
+                booleanQuery.add(wildcardQueryNameNoExtension, BooleanClause.Occur.SHOULD)
+                booleanQuery.add(wildcardQueryNameOriginalNoExtension, BooleanClause.Occur.SHOULD)
             }
 
+            // Execute the search with the constructed boolean query
             println("Executing search with query: $booleanQuery")
-            val topDocs = searcher.search(booleanQuery.build(), 100) // Limit to 100 results
-            println("Search completed. Found ${topDocs.totalHits} hits.")
+            val topDocs = searcher.search(booleanQuery.build(), Integer.MAX_VALUE) // Limit to 100 results
+            println("Found ${topDocs.totalHits} matching documents")
 
+            // Process search results
             for (scoreDoc in topDocs.scoreDocs) {
                 val doc = searcher.doc(scoreDoc.doc)
                 val itemName = doc.get("nameOriginal")
                 val itemPath = doc.get("path")
                 val isFile = doc.get("isFile")?.toBoolean() ?: false
 
+                // Log the document values to check for correctness
+                println("Document: name=$itemName, path=$itemPath, isFile=$isFile")
+
+                // Check the document against the search terms
                 if (itemName != null && itemPath != null) {
-                    println("Found item: name=$itemName, path=$itemPath, isFile=$isFile")
+                    // Check if itemName contains any of the search terms (individual check)
+                    println("Checking itemName='$itemName' for term match: ${searchTerms.any { term -> itemName.lowercase().contains(term) }}")
+
+                    // Filter results based on search mode
                     when (searchMode) {
-                        SearchMode.FILES -> if (isFile) foundItems.add(SystemItem(itemName, itemPath, isFile))
-                        SearchMode.DIRECTORIES -> if (!isFile) foundItems.add(SystemItem(itemName, itemPath, isFile))
-                        SearchMode.ALL -> foundItems.add(SystemItem(itemName, itemPath, isFile))
+                        SearchMode.FILES -> {
+                            if (isFile) foundItems.add(SystemItem(itemName, itemPath, isFile))
+                        }
+                        SearchMode.DIRECTORIES -> {
+                            if (!isFile) foundItems.add(SystemItem(itemName, itemPath, isFile))
+                        }
+                        SearchMode.ALL -> {
+                            foundItems.add(SystemItem(itemName, itemPath, isFile))
+                        }
                     }
                 }
             }
@@ -149,4 +179,5 @@ class Search(
 
         return foundItems
     }
+
 }
