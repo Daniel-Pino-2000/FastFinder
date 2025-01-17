@@ -344,6 +344,4 @@ class DBManager(private val indexDirectoryName: String = "database") {
     private fun deleteDirectory(directory: File): Boolean {
         return directory.walkBottomUp().all { it.delete() }
     }
-
-
 }
