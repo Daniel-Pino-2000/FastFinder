@@ -15,7 +15,7 @@ class Search(
     private val searcherManager: SearcherManager?
 
     init {
-        if (dbManager.isFirstIndexCreation) {
+        if (dbManager.isFirstIndexCreation || dbManager.isDeletingFile) {
             println("Index creation is in progress. Search is not allowed.")
             searcherManager = null
         } else {

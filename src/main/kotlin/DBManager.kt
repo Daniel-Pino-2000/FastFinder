@@ -29,6 +29,7 @@ class DBManager(private val indexDirectoryName: String = "database") {
 
     // Flag to track if it's the first index creation
     var isFirstIndexCreation: Boolean
+    var isDeletingFile: Boolean = false
 
     init {
         val currentDirectory = System.getProperty("user.dir")
@@ -125,6 +126,7 @@ class DBManager(private val indexDirectoryName: String = "database") {
 
                     println("\nIndexing completed. Total items indexed: $totalIndexed")
                     replaceOldIndexWithNew(newIndexPath)
+                    isDeletingFile = false
 
                     if (isFirstIndexCreation) {
                         println("Setting isFirstIndexCreation to false.")
@@ -254,6 +256,7 @@ class DBManager(private val indexDirectoryName: String = "database") {
     }
 
     private fun replaceOldIndexWithNew(newIndexPath: Path) {
+        isDeletingFile = true
         lock.lock()
         try {
             closeWriter() // Ensure no writer is active
