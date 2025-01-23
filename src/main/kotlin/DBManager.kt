@@ -13,6 +13,7 @@ import java.nio.file.*
 import java.nio.file.attribute.BasicFileAttributes
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.thread
 import kotlin.io.AccessDeniedException
@@ -30,6 +31,8 @@ class DBManager(private val indexDirectoryName: String = "database") {
     // Flag to track if it's the first index creation
     var isFirstIndexCreation: Boolean
     var isDeletingFile: Boolean = false
+
+    val isIndexing = AtomicBoolean(false)
 
     init {
         val currentDirectory = System.getProperty("user.dir")
@@ -105,7 +108,15 @@ class DBManager(private val indexDirectoryName: String = "database") {
     // You might also want to update the createOrUpdateIndex method to ensure cleanup in case of early failure
     fun createOrUpdateIndex(forceIndexCreation: Boolean = false) {
         println("Checking if index exists before updating or creating: ${indexExists()}")
+
+        // Skip if indexing is already in progress
+        if (isIndexing.get()) {
+            println("Indexing is already in progress. Skipping this request.")
+            return
+        }
+
         if (forceIndexCreation || isFirstIndexCreation || !indexExists()) {
+            isIndexing.set(true)
             var tempDirectory: Path? = null
             thread(start = true) {
                 lock.lock()
@@ -151,6 +162,7 @@ class DBManager(private val indexDirectoryName: String = "database") {
                     }
                 } finally {
                     writeStateFile()
+                    isIndexing.set(false)
                     lock.unlock()
                 }
             }

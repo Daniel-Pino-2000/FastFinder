@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -43,6 +44,8 @@ fun FastFinderApp() {
     var endTime : Long // Variable used to record the end time
     var elapsedTime = 0.0 // Calculate elapsed time in seconds
 
+    val dbManager = DBManager() // Creates an instance of the Database for updating.
+
 
     // Material theme for styling UI components
     MaterialTheme {
@@ -58,7 +61,7 @@ fun FastFinderApp() {
 
             // Row where the search bar and the buttons are located.
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                 horizontalArrangement = Arrangement.Start) {
 
                 Spacer(modifier = Modifier.width(8.dp))
@@ -181,42 +184,84 @@ fun FastFinderApp() {
 
             }
 
+
             // LazyColumn for displaying items and the Scrollbar
-            Column(
-
+            Box(
+                modifier = Modifier
+                    .padding(start = 8.dp)
+                    .width(1000.dp) // Fixed width
+                    .height(550.dp) // Fixed height
+                    .background(color = themeElements.lazyColumnColor, shape = RoundedCornerShape(5.dp))
             ) {
-                Box(
-                    modifier = Modifier.wrapContentWidth().padding(start = 8.dp)
-                    ) {
-
-
-                    LazyColumn(
-                        state = lazyListState, // Attach LazyListState to LazyColumn
-                        modifier = Modifier
-                            .padding(vertical = 16.dp)
-                            .background(color = themeElements.lazyColumnColor, shape = RoundedCornerShape(5.dp))
-                            .width(1000.dp)
-                            .height(600.dp),
-                        contentPadding = PaddingValues(8.dp),
-
-                        ) {
-                        items(testList) {
-                            item ->
-                            LazyListItem(item)
-
-
-                        }
-
+                // LazyColumn for displaying items
+                LazyColumn(
+                    state = lazyListState, // Attach LazyListState
+                    contentPadding = PaddingValues(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth() // Fill the width with the Box
+                        .fillMaxHeight() // Match the height of the Box
+                ) {
+                    items(testList) { item ->
+                        LazyListItem(item) // Composable for individual items
                     }
-                    // Scrollbar that will be located inside the LazyColumn when there is a large number of elements
-                    VerticalScrollbar(
-                        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = 8.dp, top = 24.dp, bottom = 30.dp),
-                        adapter = rememberScrollbarAdapter(lazyListState) // Use LazyListState here
-                    )
+                }
+
+                // Vertical scrollbar aligned to the right edge of the Box
+                VerticalScrollbar(
+                    adapter = rememberScrollbarAdapter(lazyListState),
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd) // Align to the right edge
+                        .fillMaxHeight() // Match the height of the Box
+                        .padding(end = 8.dp, top = 24.dp, bottom = 30.dp) // Padding for positioning
+                )
+            }
+
+            Row(
+                modifier = Modifier.width(1010.dp).padding(8.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically // Vertically centers the content of the Row
+            ) {
+
+                Spacer(modifier = Modifier.weight(1f)) // Push the content to the end of the Row
+
+                // Button that will launch the update of the database.
+                Box {
+                    Button(
+                        onClick = {
+                            if (!dbManager.isIndexing.get()) {
+                                Thread {
+                                    synchronized(dbManager) {
+                                        dbManager.createOrUpdateIndex(forceIndexCreation = true) // Update the index in the background
+                                    }
+                                }.start()
+                            }
+                        },
+                        shape = RoundedCornerShape(5.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            contentColor = Color.White,
+                            backgroundColor = themeElements.buttonColor
+
+                        ),
+                        modifier = Modifier.height(56.dp)
+                    ) {
+                        Text(text = "Update\nDatabase")
+                        Icon(Icons.Default.Refresh, contentDescription = null)
+                    }
 
                 }
             }
+            /*
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth() // Fill the width of the parent container
+                    .height(200.dp) // Set a height to the Box
+                    .padding(end = 16.dp), // Add padding from the right edge
+                contentAlignment = Alignment.BottomEnd // Align the text at the bottom-right corner
+            ) {
+                Text("Daniel Testing", style = MaterialTheme.typography.h6)
+            }
 
+             */
 
         }
     }
