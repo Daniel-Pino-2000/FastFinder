@@ -291,7 +291,7 @@ fun FastFinderApp() {
                         verticalAlignment = Alignment.CenterVertically, // Vertically center the content
                         horizontalArrangement = Arrangement.spacedBy(8.dp) // Add spacing between the text and the indicator
                     ) {
-                        if (isIndexing) {
+                        if (isIndexing || dbManager.isFirstIndexCreation) {
                             // Display the "Indexing Database" text
                             Text(
                                 text = "Indexing Database",
