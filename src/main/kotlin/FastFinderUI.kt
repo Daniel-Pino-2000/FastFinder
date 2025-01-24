@@ -19,6 +19,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 import java.io.File
 
 // Preview function to preview the app's UI in the IDE
@@ -45,6 +47,17 @@ fun FastFinderApp() {
     var elapsedTime = 0.0 // Calculate elapsed time in seconds
 
     val dbManager = DBManager() // Creates an instance of the Database for updating.
+
+    // Wrap the AtomicBoolean in a MutableState
+    var isIndexing by remember { mutableStateOf(dbManager.isIndexing.get()) }
+
+    // Use LaunchedEffect to observe changes to the AtomicBoolean
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(100) // Check every 100ms
+            isIndexing = dbManager.isIndexing.get() // Update the MutableState
+        }
+    }
 
 
     // Material theme for styling UI components
@@ -212,18 +225,16 @@ fun FastFinderApp() {
                     modifier = Modifier
                         .align(Alignment.CenterEnd) // Align to the right edge
                         .fillMaxHeight() // Match the height of the Box
-                        .padding(end = 8.dp, top = 24.dp, bottom = 30.dp) // Padding for positioning
+                        .padding(end = 8.dp, top = 24.dp, bottom = 24.dp) // Padding for positioning
                 )
             }
 
             Row(
-                modifier = Modifier.width(1010.dp).padding(8.dp),
+                modifier = Modifier.fillMaxWidth().padding(8.dp),
                 horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically // Vertically centers the content of the Row
             ) {
 
-                Spacer(modifier = Modifier.weight(1f)) // Push the content to the end of the Row
-
+                Spacer(Modifier.padding(start = 875.dp))
                 // Button that will launch the update of the database.
                 Box {
                     Button(
@@ -249,19 +260,45 @@ fun FastFinderApp() {
                     }
 
                 }
-            }
-            /*
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth() // Fill the width of the parent container
-                    .height(200.dp) // Set a height to the Box
-                    .padding(end = 16.dp), // Add padding from the right edge
-                contentAlignment = Alignment.BottomEnd // Align the text at the bottom-right corner
-            ) {
-                Text("Daniel Testing", style = MaterialTheme.typography.h6)
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth() // Fill the width of the parent container
+                        .height(65.dp) // Set a height to the Box
+                        .padding(end = 5.dp), // Add padding from the right edge
+                    contentAlignment = Alignment.BottomEnd // Align the content at the bottom-right corner
+                ) {
+                    // Use a Row to place the text and loading indicator side by side
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically, // Vertically center the content
+                        horizontalArrangement = Arrangement.spacedBy(8.dp) // Add spacing between the text and the indicator
+                    ) {
+                        if (isIndexing) {
+                            // Display the "Indexing Database" text
+                            Text(
+                                text = "Indexing Database",
+                                style = MaterialTheme.typography.body2.copy(
+                                    fontSize = 14.sp, // Smaller font size
+                                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.8f) // Subtle color
+                                )
+                            )
+
+                            // Add a CircularProgressIndicator as a loading animation
+                            // Replace `isIndexing` with your actual condition
+                            CircularProgressIndicator(
+                                modifier = Modifier
+                                    .size(20.dp), // Set the size of the progress indicator
+                                strokeWidth = 2.dp, // Set the stroke width
+                                color = MaterialTheme.colors.primary // Use the primary color from the theme
+                            )
+                        }
+                    }
+                }
             }
 
-             */
+
+
+
 
         }
     }
