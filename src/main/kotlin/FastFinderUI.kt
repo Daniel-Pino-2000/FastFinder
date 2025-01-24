@@ -234,9 +234,27 @@ fun FastFinderApp() {
                 horizontalArrangement = Arrangement.Center,
             ) {
 
-                Spacer(Modifier.padding(start = 875.dp))
+                Spacer(Modifier.padding(start = 717.dp))
                 // Button that will launch the update of the database.
+                Box(modifier = Modifier.height(56.dp).padding(horizontal = 8.dp)) {
+                    Button(
+                    onClick = {
+                        // TODO
+                    },
+                    shape = RoundedCornerShape(5.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        contentColor = Color.White,
+                        backgroundColor = themeElements.buttonColor
+
+                    ),
+                    modifier = Modifier.height(56.dp)
+                    ) {
+                    Text(text = "Custom Search")
+                    }
+                }
+
                 Box {
+
                     Button(
                         onClick = {
                             if (!dbManager.isIndexing.get()) {
