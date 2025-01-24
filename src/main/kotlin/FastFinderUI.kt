@@ -22,6 +22,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import java.io.File
+import javax.swing.JFileChooser
+import javax.swing.filechooser.FileSystemView
 
 // Preview function to preview the app's UI in the IDE
 @Composable
@@ -30,21 +32,38 @@ fun FastFinderAppPreview() {
     FastFinderApp()
 }
 
+// Function to show a directory picker and return the selected directory path
+fun showDirectoryPicker(): File? {
+    val fileChooser = JFileChooser(FileSystemView.getFileSystemView().homeDirectory) // Start at the user's home directory
+    fileChooser.dialogTitle = "Select Directory" // Set the dialog title
+    fileChooser.fileSelectionMode = JFileChooser.DIRECTORIES_ONLY // Allow only directories to be selected
+    fileChooser.isAcceptAllFileFilterUsed = false // Disable the "All files" filter
+
+    // Show the dialog and check if the user selected a directory
+    val result = fileChooser.showOpenDialog(null)
+
+    // Return the selected directory if the user clicked "Open"
+    return if (result == JFileChooser.APPROVE_OPTION) {
+        fileChooser.selectedFile
+    } else {
+        null // Return null if the user canceled the dialog
+    }
+}
+
 // The main app composable
 @Composable
 fun FastFinderApp() {
     // State for search value and other UI elements
     var searchValue by remember { mutableStateOf("") } // State for search input value
-    var isExpanded by remember { mutableStateOf(false) }// State to control dropdown menu expansion
-    var testList by remember { mutableStateOf(listOf<SystemItem>()) }// List of items to display
+    var isExpanded by remember { mutableStateOf(false) } // State to control dropdown menu expansion
+    var testList by remember { mutableStateOf(listOf<SystemItem>()) } // List of items to display
     var filterText by remember { mutableStateOf("Filter") } // Filter text (Files, Folders, All)
-    val themeElements =  ThemeElements() // Instance of the data class where the UI theme elements are saved
+    val themeElements = ThemeElements() // Instance of the data class where the UI theme elements are saved
     val lazyListState = rememberLazyListState() // LazyListState to manage the scroll state of LazyColumn
     var searchMode = SearchMode.ALL
-    val customDir = File("D:\\")  // The directory to search in when testing
-    var startTime : Long // Variable used to record the start time
-    var endTime : Long // Variable used to record the end time
-    var elapsedTime = 0.0 // Calculate elapsed time in seconds
+    var startTime: Long // Variable used to record the start time
+    var endTime: Long // Variable used to record the end time
+    var elapsedTime by remember { mutableStateOf(0.0) } // Calculate elapsed time in seconds
 
     val dbManager = DBManager() // Creates an instance of the Database for updating.
 
@@ -59,6 +78,19 @@ fun FastFinderApp() {
         }
     }
 
+    // Function to perform a search with a custom directory
+    fun performSearch(customDir: File? = null) {
+        startTime = System.nanoTime()
+        testList = emptyList()
+        testList = testList + Search(
+            searchValue = searchValue,
+            searchMode = searchMode,
+            customRootDirectory = customDir
+        ).search()
+        searchValue = ""
+        endTime = System.nanoTime()
+        elapsedTime = (endTime - startTime) / 1_000_000_000.0
+    }
 
     // Material theme for styling UI components
     MaterialTheme {
@@ -66,17 +98,14 @@ fun FastFinderApp() {
             modifier = Modifier.fillMaxSize().background(color = themeElements.backgroundColor),
             verticalArrangement = Arrangement.Top,
             horizontalAlignment = Alignment.Start,
-
-
         ) {
-
             Spacer(modifier = Modifier.height(8.dp))
 
             // Row where the search bar and the buttons are located.
             Row(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                horizontalArrangement = Arrangement.Start) {
-
+                horizontalArrangement = Arrangement.Start
+            ) {
                 Spacer(modifier = Modifier.width(8.dp))
 
                 OutlinedTextField(
@@ -91,13 +120,7 @@ fun FastFinderApp() {
                         .onKeyEvent { event -> // Starts the search if the "Enter" button is pressed
                             // Handle Enter key
                             if (event.type == KeyEventType.KeyUp && event.key == Key.Enter) {
-                                startTime = System.nanoTime()
-                                testList = emptyList()
-                                testList = testList + (Search(searchValue = searchValue, searchMode = searchMode, customRootDirectory = null).search())
-                                searchValue = "" // Clear search after adding
-                                endTime = System.nanoTime()
-                                // Calculate elapsed time in seconds
-                                elapsedTime = (endTime - startTime) / 1_000_000_000.0
+                                performSearch() // Perform the search
                                 true // Indicate event was handled
                             } else {
                                 false
@@ -107,30 +130,22 @@ fun FastFinderApp() {
 
                 // Search button that starts the search
                 Box {
-
                     Button(
                         onClick = {
-                            startTime = System.nanoTime()
-                            testList = emptyList()
-                            testList = testList + (Search(searchValue = searchValue, searchMode = searchMode, customRootDirectory = null).search())
-                            searchValue = ""
-                            endTime = System.nanoTime()
-                            // Calculate elapsed time in seconds
-                            elapsedTime = (endTime - startTime) / 1_000_000_000.0
+                            performSearch() // Perform the search
                         },
                         colors = ButtonDefaults.buttonColors(
                             backgroundColor = themeElements.buttonColor,
                             contentColor = Color.White
-
                         ),
                         shape = RoundedCornerShape(
                             topStart = 0.dp, // Straight top-left corner
-                            topEnd = 20.dp,   // Curved top-right corner
+                            topEnd = 20.dp, // Curved top-right corner
                             bottomStart = 0.dp, // Straight bottom-left corner
-                            bottomEnd = 20.dp  // Curved bottom-right corner
+                            bottomEnd = 20.dp // Curved bottom-right corner
                         ),
                         modifier = Modifier.height(57.dp).offset(x = (-2).dp)
-                        ) {
+                    ) {
                         Icon(Icons.Default.Search, contentDescription = null)
                     }
                 }
@@ -139,14 +154,12 @@ fun FastFinderApp() {
 
                 // Filter button with dropdown
                 Box {
-
                     Button(
                         onClick = { isExpanded = true },
                         shape = RoundedCornerShape(5.dp),
                         colors = ButtonDefaults.buttonColors(
                             backgroundColor = themeElements.buttonColor,
                             contentColor = Color.White
-
                         ),
                         modifier = Modifier.height(56.dp)
                     ) {
@@ -154,9 +167,7 @@ fun FastFinderApp() {
                         Icon(Icons.Default.ArrowDropDown, contentDescription = null)
                     }
 
-
-                    DropdownMenu(expanded = isExpanded, onDismissRequest = { isExpanded = false}) {
-
+                    DropdownMenu(expanded = isExpanded, onDismissRequest = { isExpanded = false }) {
                         DropdownMenuItem(
                             onClick = {
                                 filterText = "Files"
@@ -166,7 +177,6 @@ fun FastFinderApp() {
                         ) {
                             Text("Files")
                         }
-
                         DropdownMenuItem(
                             onClick = {
                                 filterText = "Folders"
@@ -176,27 +186,20 @@ fun FastFinderApp() {
                         ) {
                             Text("Folders")
                         }
-
                         DropdownMenuItem(
                             onClick = {
                                 filterText = "All"
                                 searchMode = SearchMode.ALL
                                 isExpanded = false
-
                             }
                         ) {
                             Text("All")
                         }
-
                     }
                 }
 
                 Text("$elapsedTime")
-
-
-
             }
-
 
             // LazyColumn for displaying items and the Scrollbar
             Box(
@@ -229,32 +232,46 @@ fun FastFinderApp() {
                 )
             }
 
+            // Update Database button and Indexing Status
             Row(
                 modifier = Modifier.fillMaxWidth().padding(8.dp),
                 horizontalArrangement = Arrangement.Center,
             ) {
+                Spacer(Modifier.padding(start = 710.dp))
 
-                Spacer(Modifier.padding(start = 717.dp))
-                // Button that will launch the update of the database.
+                // Custom Search Button
                 Box(modifier = Modifier.height(56.dp).padding(horizontal = 8.dp)) {
                     Button(
-                    onClick = {
-                        // TODO
-                    },
-                    shape = RoundedCornerShape(5.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        contentColor = Color.White,
-                        backgroundColor = themeElements.buttonColor
+                        onClick = {
+                            /*
+                            // Open the directory picker
+                            val selectedDirectory = showDirectoryPicker()
 
-                    ),
-                    modifier = Modifier.height(56.dp)
+                            // If a directory is selected, perform the custom search
+                            selectedDirectory?.let { dir ->
+                                performSearch(dir) // Perform the search in the selected directory
+                            } ?: run {
+                                // Show an error message if no directory is selected
+                                println("No directory selected or invalid directory.")
+                            }
+
+                             */
+                        },
+                        shape = RoundedCornerShape(5.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            contentColor = Color.White,
+                            backgroundColor = themeElements.buttonColor
+                        ),
+                        modifier = Modifier.height(56.dp)
                     ) {
-                    Text(text = "Custom Search")
+                        Text(text = "Custom Search")
                     }
                 }
 
-                Box {
+                Spacer(Modifier.width(8.dp))
 
+                // Update Database Button
+                Box {
                     Button(
                         onClick = {
                             if (!dbManager.isIndexing.get()) {
@@ -269,16 +286,15 @@ fun FastFinderApp() {
                         colors = ButtonDefaults.buttonColors(
                             contentColor = Color.White,
                             backgroundColor = themeElements.buttonColor
-
                         ),
                         modifier = Modifier.height(56.dp)
                     ) {
                         Text(text = "Update\nDatabase")
                         Icon(Icons.Default.Refresh, contentDescription = null)
                     }
-
                 }
 
+                // Indexing Status with Loading Animation
                 Box(
                     modifier = Modifier
                         .fillMaxWidth() // Fill the width of the parent container
@@ -302,7 +318,6 @@ fun FastFinderApp() {
                             )
 
                             // Add a CircularProgressIndicator as a loading animation
-                            // Replace `isIndexing` with your actual condition
                             CircularProgressIndicator(
                                 modifier = Modifier
                                     .size(20.dp), // Set the size of the progress indicator
@@ -313,13 +328,6 @@ fun FastFinderApp() {
                     }
                 }
             }
-
-
-
-
-
         }
     }
 }
-
-
