@@ -310,28 +310,61 @@ fun FastFinderApp(dbManager: DBManager) {
 
             // Update Database button and Indexing Status
             Row(
-                modifier = Modifier.fillMaxWidth().padding(8.dp),
-                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                verticalAlignment = Alignment.Bottom, // Align children to the bottom
+                horizontalArrangement = Arrangement.SpaceBetween // Space out children
             ) {
-                Spacer(Modifier.padding(start = 710.dp))
+                // Indexing Status with Loading Animation (Bottom-Left Corner)
+                Row(
+                    modifier = Modifier
+                        .weight(1f) // Take up remaining space
+                        .padding(start = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Start
+                ) {
+                    if (isIndexing) {
+                        // Display the "Indexing Database" text
+                        Text(
+                            text = "Indexing Database",
+                            style = MaterialTheme.typography.body2.copy(
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colors.onSurface.copy(alpha = 0.8f)
+                            )
+                        )
 
-                // Custom Search Button
-                Box(modifier = Modifier.height(56.dp).padding(horizontal = 8.dp)) {
+                        // Add a CircularProgressIndicator as a loading animation
+                        Spacer(modifier = Modifier.width(8.dp))
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colors.primary
+                        )
+                    }
+                }
+
+                // Buttons (Far Right Side)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    // Custom Search Button
                     Button(
                         onClick = {
                             /*
-                            // Open the directory picker
-                            val selectedDirectory = showDirectoryPicker()
+                           // Open the directory picker
+                           val selectedDirectory = showDirectoryPicker()
 
-                            // If a directory is selected, perform the custom search
-                            selectedDirectory?.let { dir ->
-                                performSearch(dir) // Perform the search in the selected directory
-                            } ?: run {
-                                // Show an error message if no directory is selected
-                                println("No directory selected or invalid directory.")
-                            }
+                           // If a directory is selected, perform the custom search
+                           selectedDirectory?.let { dir ->
+                               performSearch(dir) // Perform the search in the selected directory
+                           } ?: run {
+                               // Show an error message if no directory is selected
+                               println("No directory selected or invalid directory.")
+                           }
 
-                             */
+                            */
                         },
                         shape = RoundedCornerShape(5.dp),
                         colors = ButtonDefaults.buttonColors(
@@ -342,18 +375,16 @@ fun FastFinderApp(dbManager: DBManager) {
                     ) {
                         Text(text = "Custom Search")
                     }
-                }
 
-                Spacer(Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
 
-                // Update Database Button
-                Box {
+                    // Update Database Button
                     Button(
                         onClick = {
                             if (!dbManager.isIndexing.get()) {
                                 Thread {
                                     synchronized(dbManager) {
-                                        dbManager.createOrUpdateIndex(forceIndexCreation = true) // Update the index in the background
+                                        dbManager.createOrUpdateIndex(forceIndexCreation = true)
                                     }
                                 }.start()
                             }
@@ -365,42 +396,10 @@ fun FastFinderApp(dbManager: DBManager) {
                         ),
                         modifier = Modifier.height(56.dp)
                     ) {
+
                         Text(text = "Update\nDatabase")
                         Icon(Icons.Default.Refresh, contentDescription = null)
-                    }
-                }
 
-                // Indexing Status with Loading Animation
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth() // Fill the width of the parent container
-                        .height(65.dp) // Set a height to the Box
-                        .padding(start = 5.dp), // Add padding from the right edge
-                    contentAlignment = Alignment.BottomEnd // Align the content at the bottom-right corner
-                ) {
-                    // Use a Row to place the text and loading indicator side by side
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically, // Vertically center the content
-                        horizontalArrangement = Arrangement.spacedBy(8.dp) // Add spacing between the text and the indicator
-                    ) {
-                        if (isIndexing) {
-                            // Display the "Indexing Database" text
-                            Text(
-                                text = "Indexing Database",
-                                style = MaterialTheme.typography.body2.copy(
-                                    fontSize = 14.sp, // Smaller font size
-                                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.8f) // Subtle color
-                                )
-                            )
-
-                            // Add a CircularProgressIndicator as a loading animation
-                            CircularProgressIndicator(
-                                modifier = Modifier
-                                    .size(20.dp), // Set the size of the progress indicator
-                                strokeWidth = 2.dp, // Set the stroke width
-                                color = MaterialTheme.colors.primary // Use the primary color from the theme
-                            )
-                        }
                     }
                 }
             }
