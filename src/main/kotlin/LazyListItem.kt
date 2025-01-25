@@ -20,7 +20,12 @@ import java.io.File
 fun LazyListItem(item: SystemItem, resultMode: SearchFilter) {
 
     var isHovered by remember { mutableStateOf(false) } // State to track hover
-    var fileType : SearchFilter
+    var fileType : SearchFilter = getFileType(File(item.itemPath))
+
+    // Only display the item if it matches the resultMode or if resultMode is ALL
+    if (resultMode != SearchFilter.ALL && fileType != resultMode) {
+        return
+    }
 
     // Determine icon for file or folder
     val icon: ImageVector = if (item.isFile) {
