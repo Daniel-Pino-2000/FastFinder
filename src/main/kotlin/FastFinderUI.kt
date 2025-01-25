@@ -112,7 +112,8 @@ fun FastFinderApp(dbManager: DBManager) {
                     ),
                     singleLine = true,
                     modifier = Modifier
-                        .width(670.dp) // Set width dynamically based on screen size
+                        //.width(670.dp) // Set width dynamically based on screen size
+                        .weight(1f) // Takes up remaining space in the Row
                         .onKeyEvent { event -> // Starts the search if the "Enter" button is pressed
                             // Handle Enter key
                             if (event.type == KeyEventType.KeyUp && event.key == Key.Enter) {
@@ -157,7 +158,7 @@ fun FastFinderApp(dbManager: DBManager) {
                             backgroundColor = themeElements.buttonColor,
                             contentColor = Color.White
                         ),
-                        modifier = Modifier.height(56.dp)
+                        modifier = Modifier.height(56.dp).padding(end = 8.dp)
                     ) {
                         Text(text = searchFilter)
                         Icon(Icons.Default.ArrowDropDown, contentDescription = null)
@@ -194,7 +195,7 @@ fun FastFinderApp(dbManager: DBManager) {
                     }
                 }
 
-                Spacer(modifier = Modifier.width(16.dp))
+
 
                 // Search results filter button with dropdown
                 Box {
@@ -205,7 +206,7 @@ fun FastFinderApp(dbManager: DBManager) {
                             backgroundColor = themeElements.buttonColor,
                             contentColor = Color.White
                         ),
-                        modifier = Modifier.height(56.dp)
+                        modifier = Modifier.height(56.dp).padding(end = 12.dp)
                     ) {
                         Text(text = resultFilter)
                         Icon(Icons.Default.ArrowDropDown, contentDescription = null)
@@ -273,15 +274,15 @@ fun FastFinderApp(dbManager: DBManager) {
                     }
                 }
 
-                Text("$elapsedTime")
             }
 
             // LazyColumn for displaying items and the Scrollbar
             Box(
                 modifier = Modifier
-                    .padding(start = 8.dp)
-                    .width(1000.dp) // Fixed width
-                    .height(550.dp) // Fixed height
+                    .padding(horizontal = 8.dp)
+                    .weight(1f)
+                    .fillMaxHeight()
+                    //.height(550.dp) // Fixed height
                     .background(color = themeElements.lazyColumnColor, shape = RoundedCornerShape(5.dp))
             ) {
                 // LazyColumn for displaying items
@@ -374,7 +375,7 @@ fun FastFinderApp(dbManager: DBManager) {
                     modifier = Modifier
                         .fillMaxWidth() // Fill the width of the parent container
                         .height(65.dp) // Set a height to the Box
-                        .padding(end = 5.dp), // Add padding from the right edge
+                        .padding(start = 5.dp), // Add padding from the right edge
                     contentAlignment = Alignment.BottomEnd // Align the content at the bottom-right corner
                 ) {
                     // Use a Row to place the text and loading indicator side by side
