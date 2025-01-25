@@ -41,6 +41,11 @@ fun LazyListItem(item: SystemItem, resultMode: SearchFilter) {
         ThemeElements().folderIcon // Assign folder icon to `icon`
     }
 
+    // Calculate and format the size
+    val file = File(item.itemPath)
+    val size = getSize(file)
+    val formattedSize = formatSize(size)
+
     Row(modifier = Modifier.pointerInput(Unit) {
         // Detect hover using PointerEventType
         awaitPointerEventScope {
@@ -67,6 +72,12 @@ fun LazyListItem(item: SystemItem, resultMode: SearchFilter) {
             modifier = Modifier.padding(8.dp).weight(1f)
         )
 
+        // Display the size
+        Text(
+            text = formattedSize,
+            modifier = Modifier.padding(8.dp)
+        )
+
         if (isHovered) { // Displays the clickable icon if it is hovered
             // If clicked, open the location of the file or the folder
             Icon(
@@ -78,7 +89,11 @@ fun LazyListItem(item: SystemItem, resultMode: SearchFilter) {
                         // Ensure item.itemPath is a valid path, then open in file explorer
                         val file = File(item.itemPath)
                         if (file.exists()) {
-                            Desktop.getDesktop().browse(file.toURI())  // Opens the location in file explorer
+                            val parentDir = file.parentFile
+                            if (parentDir != null && parentDir.exists()) {
+                                // Open the parent directory in the file explorer
+                                Desktop.getDesktop().browse(parentDir.toURI())
+                            }
                         }
                     }
             )
@@ -103,4 +118,26 @@ fun getFileType(file: File): SearchFilter {
         // Default case
         else -> SearchFilter.ALL
     }
+}
+
+// Calculates the size of a file or directory
+fun getSize(file: File): Long {
+    return if (file.isFile) {
+        file.length()
+    } else {
+        file.walk().filter { it.isFile }.map { it.length() }.sum()
+    }
+}
+
+fun formatSize(size: Long): String {
+    val units = listOf("B", "KB", "MB", "GB", "TB")
+    var sizeInUnits = size.toDouble()
+    var unitIndex = 0
+
+    while (sizeInUnits >= 1024 && unitIndex < units.size - 1) {
+        sizeInUnits /= 1024
+        unitIndex++
+    }
+
+    return "%.2f %s".format(sizeInUnits, units[unitIndex])
 }
