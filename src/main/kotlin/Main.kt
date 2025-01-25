@@ -24,6 +24,6 @@ fun main() = application {
         }.start()
 
         // Call the FastFinderApp composable to display the main content
-        FastFinderApp()
+        FastFinderApp(dbManager)
     }
 }

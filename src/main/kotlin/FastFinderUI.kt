@@ -1,5 +1,4 @@
 // Importing necessary Compose libraries for UI components and functionality
-import androidx.compose.desktop.ui.tooling.preview.Preview
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -25,12 +24,6 @@ import java.io.File
 import javax.swing.JFileChooser
 import javax.swing.filechooser.FileSystemView
 
-// Preview function to preview the app's UI in the IDE
-@Composable
-@Preview
-fun FastFinderAppPreview() {
-    FastFinderApp()
-}
 
 // Function to show a directory picker and return the selected directory path
 fun showDirectoryPicker(): File? {
@@ -52,7 +45,7 @@ fun showDirectoryPicker(): File? {
 
 // The main app composable
 @Composable
-fun FastFinderApp() {
+fun FastFinderApp(dbManager: DBManager) {
     // State for search value and other UI elements
     var searchValue by remember { mutableStateOf("") } // State for search input value
     var isExpanded by remember { mutableStateOf(false) } // State to control dropdown menu expansion of the search mode
@@ -68,7 +61,6 @@ fun FastFinderApp() {
     var endTime: Long // Variable used to record the end time
     var elapsedTime by remember { mutableStateOf(0.0) } // Calculate elapsed time in seconds
 
-    val dbManager = DBManager() // Creates an instance of the Database for updating.
 
     // Wrap the AtomicBoolean in a MutableState
     var isIndexing by remember { mutableStateOf(dbManager.isIndexing.get()) }
@@ -88,7 +80,8 @@ fun FastFinderApp() {
         testList = testList + Search(
             searchValue = searchValue,
             searchMode = searchMode,
-            customRootDirectory = customDir
+            customRootDirectory = customDir,
+            dbManager
         ).search()
         searchValue = ""
         endTime = System.nanoTime()
