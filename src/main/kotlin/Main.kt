@@ -18,6 +18,7 @@ fun main() = application {
         val dbManager = DBManager()
         Thread {
             synchronized(dbManager) {
+                // dbManager.isIndexing.set(true)
                 dbManager.createOrUpdateIndex(forceIndexCreation = false) // Create or update the index in the background
             }
         }.start()

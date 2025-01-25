@@ -23,3 +23,15 @@ enum class SearchMode {
     DIRECTORIES,
     ALL
 }
+
+/**
+ * Enum defining the different filters for the search results.
+ */
+enum class SearchFilter {
+    DOCUMENT,
+    AUDIO,
+    IMAGE,
+    VIDEO,
+    ALL,
+    EXECUTABLE
+}

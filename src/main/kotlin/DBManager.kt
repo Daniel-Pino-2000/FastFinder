@@ -142,6 +142,7 @@ class DBManager(private val indexDirectoryName: String = "database") {
                     if (isFirstIndexCreation) {
                         println("Setting isFirstIndexCreation to false.")
                         isFirstIndexCreation = false
+                        isIndexing.set(false)
                         writeStateFile()
                     }
                 } catch (e: Exception) {

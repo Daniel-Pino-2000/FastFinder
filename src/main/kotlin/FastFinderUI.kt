@@ -55,12 +55,15 @@ fun showDirectoryPicker(): File? {
 fun FastFinderApp() {
     // State for search value and other UI elements
     var searchValue by remember { mutableStateOf("") } // State for search input value
-    var isExpanded by remember { mutableStateOf(false) } // State to control dropdown menu expansion
+    var isExpanded by remember { mutableStateOf(false) } // State to control dropdown menu expansion of the search mode
+    var filterExpanded by remember { mutableStateOf(false)} // State to control the dropdown menu of the file filter
     var testList by remember { mutableStateOf(listOf<SystemItem>()) } // List of items to display
-    var filterText by remember { mutableStateOf("Filter") } // Filter text (Files, Folders, All)
+    var searchFilter by remember { mutableStateOf("Search \nMode ") } // Filter text (Files, Folders, All)
+    var resultFilter by remember { mutableStateOf("Filter\nResults") } // Filter results
     val themeElements = ThemeElements() // Instance of the data class where the UI theme elements are saved
     val lazyListState = rememberLazyListState() // LazyListState to manage the scroll state of LazyColumn
     var searchMode = SearchMode.ALL
+    var resultMode = SearchFilter.ALL
     var startTime: Long // Variable used to record the start time
     var endTime: Long // Variable used to record the end time
     var elapsedTime by remember { mutableStateOf(0.0) } // Calculate elapsed time in seconds
@@ -163,14 +166,14 @@ fun FastFinderApp() {
                         ),
                         modifier = Modifier.height(56.dp)
                     ) {
-                        Text(text = filterText)
+                        Text(text = searchFilter)
                         Icon(Icons.Default.ArrowDropDown, contentDescription = null)
                     }
 
                     DropdownMenu(expanded = isExpanded, onDismissRequest = { isExpanded = false }) {
                         DropdownMenuItem(
                             onClick = {
-                                filterText = "Files"
+                                searchFilter = "Files"
                                 searchMode = SearchMode.FILES
                                 isExpanded = false
                             }
@@ -179,7 +182,7 @@ fun FastFinderApp() {
                         }
                         DropdownMenuItem(
                             onClick = {
-                                filterText = "Folders"
+                                searchFilter = "Folders"
                                 searchMode = SearchMode.DIRECTORIES
                                 isExpanded = false
                             }
@@ -188,12 +191,91 @@ fun FastFinderApp() {
                         }
                         DropdownMenuItem(
                             onClick = {
-                                filterText = "All"
+                                searchFilter = "All"
                                 searchMode = SearchMode.ALL
                                 isExpanded = false
                             }
                         ) {
                             Text("All")
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                // Search results filter button with dropdown
+                Box {
+                    Button(
+                        onClick = { filterExpanded = true },
+                        shape = RoundedCornerShape(5.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            backgroundColor = themeElements.buttonColor,
+                            contentColor = Color.White
+                        ),
+                        modifier = Modifier.height(56.dp)
+                    ) {
+                        Text(text = resultFilter)
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                    }
+
+                    DropdownMenu(expanded = filterExpanded, onDismissRequest = { filterExpanded = false }) {
+
+                        DropdownMenuItem(
+                            onClick = {
+                                resultFilter = "All"
+                                resultMode = SearchFilter.ALL
+                                filterExpanded = false
+                            }
+                        ) {
+                            Text("All")
+                        }
+
+                        DropdownMenuItem(
+                            onClick = {
+                                resultFilter = "Images"
+                                resultMode = SearchFilter.IMAGE
+                                filterExpanded = false
+                            }
+                        ) {
+                            Text("Images")
+                        }
+                        DropdownMenuItem(
+                            onClick = {
+                                resultFilter = "Documents"
+                                resultMode = SearchFilter.DOCUMENT
+                                filterExpanded = false
+                            }
+                        ) {
+                            Text("Documents")
+                        }
+                        DropdownMenuItem(
+                            onClick = {
+                                resultFilter = "Videos"
+                                resultMode = SearchFilter.VIDEO
+                                filterExpanded = false
+                            }
+                        ) {
+                            Text("Videos")
+                        }
+
+                        DropdownMenuItem(
+                            onClick = {
+                                resultFilter = "Audios"
+                                resultMode = SearchFilter.AUDIO
+                                filterExpanded = false
+                            }
+                        ) {
+                            Text("Audios")
+                        }
+
+                        DropdownMenuItem(
+                            onClick = {
+                                resultFilter = "Executables"
+                                resultMode = SearchFilter.EXECUTABLE
+                                filterExpanded = false
+                            }
+                        ) {
+                            Text("Executables")
                         }
                     }
                 }
@@ -218,7 +300,7 @@ fun FastFinderApp() {
                         .fillMaxHeight() // Match the height of the Box
                 ) {
                     items(testList) { item ->
-                        LazyListItem(item) // Composable for individual items
+                        LazyListItem(item, resultMode) // Composable for individual items
                     }
                 }
 
@@ -307,7 +389,7 @@ fun FastFinderApp() {
                         verticalAlignment = Alignment.CenterVertically, // Vertically center the content
                         horizontalArrangement = Arrangement.spacedBy(8.dp) // Add spacing between the text and the indicator
                     ) {
-                        if (isIndexing || dbManager.isFirstIndexCreation) {
+                        if (isIndexing) {
                             // Display the "Indexing Database" text
                             Text(
                                 text = "Indexing Database",

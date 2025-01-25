@@ -1,4 +1,4 @@
-import androidx.compose.material.Icon
+
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.ui.graphics.Color
@@ -11,6 +11,11 @@ data class ThemeElements(
     val lazyColumnColor: Color = Color(0xFFE5E1DA),
 
     val fileIcon: ImageVector = Icons.Default.InsertDriveFile,
+    val audioFileIcon: ImageVector = Icons.Default.AudioFile,
+    val videoFileIcon: ImageVector = Icons.Default.VideoFile,
+    val documentFileIcon: ImageVector = Icons.Default.Description,
+    val imageFileIcon: ImageVector = Icons.Default.Image,
+    val executableFileIcon: ImageVector = Icons.Default.FileOpen,
     val folderIcon: ImageVector = Icons.Default.Folder,
     val openFolderIcon: ImageVector = Icons.Default.FolderOpen
 )

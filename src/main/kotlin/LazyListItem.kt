@@ -1,3 +1,4 @@
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
@@ -13,19 +14,26 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import java.awt.Desktop
 import java.io.File
-import java.net.URI
 
 // Displays each item in the list with hover effect
 @Composable
-fun LazyListItem(item: SystemItem) {
+fun LazyListItem(item: SystemItem, resultMode: SearchFilter) {
 
     var isHovered by remember { mutableStateOf(false) } // State to track hover
+    var fileType : SearchFilter
 
     // Determine icon for file or folder
     val icon: ImageVector = if (item.isFile) {
-        ThemeElements().fileIcon
+        when (getFileType(File(item.itemPath))) {
+            SearchFilter.ALL -> ThemeElements().fileIcon
+            SearchFilter.IMAGE -> ThemeElements().imageFileIcon
+            SearchFilter.VIDEO -> ThemeElements().videoFileIcon
+            SearchFilter.DOCUMENT -> ThemeElements().documentFileIcon
+            SearchFilter.AUDIO -> ThemeElements().audioFileIcon
+            SearchFilter.EXECUTABLE -> ThemeElements().executableFileIcon
+        }
     } else {
-        ThemeElements().folderIcon
+        ThemeElements().folderIcon // Assign folder icon to `icon`
     }
 
     Row(modifier = Modifier.pointerInput(Unit) {
@@ -70,5 +78,24 @@ fun LazyListItem(item: SystemItem) {
                     }
             )
         }
+    }
+}
+
+// Function to check the type of the file
+fun getFileType(file: File): SearchFilter {
+    val extension = file.extension.lowercase()
+    return when (extension) {
+        // Video formats
+        "mp4", "mkv", "avi", "mov", "wmv", "flv", "webm" -> SearchFilter.VIDEO
+        // Audio formats
+        "mp3", "wav", "aac", "flac", "ogg", "m4a" -> SearchFilter.AUDIO
+        // Image formats
+        "jpg", "jpeg", "png", "gif", "bmp", "webp", "svg" -> SearchFilter.IMAGE
+        // Document formats
+        "pdf", "doc", "docx", "txt", "xls", "xlsx", "ppt", "pptx", "odt", "rtf" -> SearchFilter.DOCUMENT
+        // Executable formats
+        "exe", "msi", "bat", "sh", "app", "apk" -> SearchFilter.EXECUTABLE
+        // Default case
+        else -> SearchFilter.ALL
     }
 }
