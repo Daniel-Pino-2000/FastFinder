@@ -130,6 +130,7 @@ class Search(
                 val itemName = doc.get("nameOriginal")?.lowercase() // Ensure case-insensitive comparison
                 val itemPath = doc.get("path")
                 val isFile = doc.get("isFile")?.toBoolean() ?: false
+                val size = doc.get("sizeDisplay")?.toLongOrNull() ?: 0L // Handle missing or null size
 
                 println("Match found: name='$itemName', path='$itemPath', score=${scoreDoc.score}")
 
@@ -141,9 +142,9 @@ class Search(
 
                     if (allTermsMatch) {
                         when (searchMode) {
-                            SearchMode.FILES -> if (isFile) foundItems.add(SystemItem(itemName, itemPath, isFile))
-                            SearchMode.DIRECTORIES -> if (!isFile) foundItems.add(SystemItem(itemName, itemPath, isFile))
-                            SearchMode.ALL -> foundItems.add(SystemItem(itemName, itemPath, isFile))
+                            SearchMode.FILES -> if (isFile) foundItems.add(SystemItem(itemName, itemPath, isFile, size))
+                            SearchMode.DIRECTORIES -> if (!isFile) foundItems.add(SystemItem(itemName, itemPath, isFile, size))
+                            SearchMode.ALL -> foundItems.add(SystemItem(itemName, itemPath, isFile, size))
                         }
                     }
                 }

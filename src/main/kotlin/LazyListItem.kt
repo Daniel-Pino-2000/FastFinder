@@ -1,4 +1,3 @@
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
@@ -43,8 +42,7 @@ fun LazyListItem(item: SystemItem, resultMode: SearchFilter) {
 
     // Calculate and format the size
     val file = File(item.itemPath)
-    val size = getSize(file)
-    val formattedSize = formatSize(size)
+    val size = formatSize(item.itemSize)
 
     Row(modifier = Modifier.pointerInput(Unit) {
         // Detect hover using PointerEventType
@@ -74,7 +72,7 @@ fun LazyListItem(item: SystemItem, resultMode: SearchFilter) {
 
         // Display the size
         Text(
-            text = formattedSize,
+            text = size,
             modifier = Modifier.padding(8.dp)
         )
 
@@ -120,14 +118,6 @@ fun getFileType(file: File): SearchFilter {
     }
 }
 
-// Calculates the size of a file or directory
-fun getSize(file: File): Long {
-    return if (file.isFile) {
-        file.length()
-    } else {
-        file.walk().filter { it.isFile }.map { it.length() }.sum()
-    }
-}
 
 fun formatSize(size: Long): String {
     val units = listOf("B", "KB", "MB", "GB", "TB")

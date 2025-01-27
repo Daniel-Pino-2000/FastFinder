@@ -1,8 +1,5 @@
 import org.apache.lucene.analysis.standard.StandardAnalyzer
-import org.apache.lucene.document.Document
-import org.apache.lucene.document.Field
-import org.apache.lucene.document.StringField
-import org.apache.lucene.document.TextField
+import org.apache.lucene.document.*
 import org.apache.lucene.index.DirectoryReader
 import org.apache.lucene.index.IndexWriter
 import org.apache.lucene.index.IndexWriterConfig
@@ -11,9 +8,11 @@ import java.io.File
 import java.io.IOException
 import java.nio.file.*
 import java.nio.file.attribute.BasicFileAttributes
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.thread
 import kotlin.io.AccessDeniedException
@@ -65,7 +64,6 @@ class DBManager(private val indexDirectoryName: String = "database") {
 
     private fun writeStateFile() {
         try {
-            // Save the state of index creation along with the index path
             Files.write(stateFilePath, listOf(isFirstIndexCreation.toString(), indexPath.toString()),
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
         } catch (e: IOException) {
@@ -105,11 +103,9 @@ class DBManager(private val indexDirectoryName: String = "database") {
         }
     }
 
-    // You might also want to update the createOrUpdateIndex method to ensure cleanup in case of early failure
     fun createOrUpdateIndex(forceIndexCreation: Boolean = false) {
         println("Checking if index exists before updating or creating: ${indexExists()}")
 
-        // Skip if indexing is already in progress
         if (isIndexing.get()) {
             println("Indexing is already in progress. Skipping this request.")
             return
@@ -147,7 +143,6 @@ class DBManager(private val indexDirectoryName: String = "database") {
                     }
                 } catch (e: Exception) {
                     println("Error during indexing: ${e.message}")
-                    // Clean up temporary directory in case of failure
                     tempDirectory?.let { tempDir ->
                         try {
                             System.gc()
@@ -173,12 +168,12 @@ class DBManager(private val indexDirectoryName: String = "database") {
         }
     }
 
-
     private fun indexFilesAndDirectories(indexWriter: IndexWriter) {
-        //val roots = File.listRoots()
-        val roots = listOf(File("D:\\Daniel"))
-
+        val roots = listOf(File("C:\\"))
         val executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors())
+
+        // Use a thread-safe map to store directory sizes
+        val directorySizes = ConcurrentHashMap<Path, AtomicLong>()
 
         roots.forEach { root ->
             executor.submit {
@@ -189,35 +184,56 @@ class DBManager(private val indexDirectoryName: String = "database") {
                     Files.walkFileTree(rootPath, object : SimpleFileVisitor<Path>() {
                         override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
                             try {
-                                addToIndex(file, indexWriter, true)
+                                val fileSize = attrs.size()
+                                addToIndex(file, indexWriter, true, fileSize)
+
+                                // Update parent directory sizes atomically
+                                var currentDir = file.parent
+                                while (currentDir != null) {
+                                    directorySizes.computeIfAbsent(currentDir) { AtomicLong(0) }.addAndGet(fileSize)
+                                    currentDir = currentDir.parent
+                                }
                             } catch (e: AccessDeniedException) {
-                                skippedPaths.add("File: ${file.toString()} (Access Denied)")
+                                skippedPaths.add("File: ${file} (Access Denied)")
                             } catch (e: Exception) {
-                                skippedPaths.add("File: ${file.toString()} (${e.message})")
+                                skippedPaths.add("File: ${file} (${e.message})")
                             }
                             return FileVisitResult.CONTINUE
                         }
 
                         override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
                             if (isRestrictedDirectory(dir)) {
-                                skippedPaths.add("Directory: ${dir.toString()} (Restricted)")
+                                skippedPaths.add("Directory: ${dir} (Restricted)")
                                 return FileVisitResult.SKIP_SUBTREE
                             }
 
                             try {
-                                addToIndex(dir, indexWriter, false)
+                                // Initialize directory size to 0 atomically
+                                directorySizes.putIfAbsent(dir, AtomicLong(0))
                             } catch (e: AccessDeniedException) {
-                                skippedPaths.add("Directory: ${dir.toString()} (Access Denied)")
+                                skippedPaths.add("Directory: ${dir} (Access Denied)")
                                 return FileVisitResult.SKIP_SUBTREE
                             } catch (e: Exception) {
-                                skippedPaths.add("Directory: ${dir.toString()} (${e.message})")
+                                skippedPaths.add("Directory: ${dir} (${e.message})")
                                 return FileVisitResult.SKIP_SUBTREE
                             }
                             return FileVisitResult.CONTINUE
                         }
 
+                        override fun postVisitDirectory(dir: Path, exc: IOException?): FileVisitResult {
+                            if (exc != null) {
+                                skippedPaths.add("Directory: ${dir} (${exc.message})")
+                                return FileVisitResult.CONTINUE
+                            }
+
+                            // Add the directory to the index with its accumulated size
+                            val dirSize = directorySizes[dir]?.get() ?: 0L
+                            addToIndex(dir, indexWriter, false, dirSize)
+                            return FileVisitResult.CONTINUE
+                        }
+
                         override fun visitFileFailed(file: Path, exc: IOException): FileVisitResult {
-                            skippedPaths.add("Failed to access: ${file.toString()} (${exc.message})")
+                            skippedPaths.add("Failed to access: ${file} (${exc.message})")
                             return FileVisitResult.CONTINUE
                         }
                     })
@@ -237,7 +253,8 @@ class DBManager(private val indexDirectoryName: String = "database") {
         }
     }
 
-    private fun addToIndex(path: Path, indexWriter: IndexWriter, isFile: Boolean) {
+
+    private fun addToIndex(path: Path, indexWriter: IndexWriter, isFile: Boolean, size: Long) {
         val document = Document()
         val fullFileName = path.fileName?.toString() ?: return
         document.add(TextField("nameOriginal", fullFileName, Field.Store.YES))
@@ -246,6 +263,8 @@ class DBManager(private val indexDirectoryName: String = "database") {
         document.add(StringField("parent", parentPath, Field.Store.YES))
         document.add(StringField("path", path.toAbsolutePath().toString(), Field.Store.YES))
         document.add(StringField("isFile", isFile.toString(), Field.Store.YES))
+        document.add(LongPoint("size", size))
+        document.add(TextField("sizeDisplay", size.toString(), Field.Store.YES))
 
         indexWriter.addDocument(document)
         totalIndexed++
@@ -272,7 +291,7 @@ class DBManager(private val indexDirectoryName: String = "database") {
         isDeletingFile = true
         lock.lock()
         try {
-            closeWriter() // Ensure no writer is active
+            closeWriter()
             println("Finalizing index creation...")
 
             val oldIndexDir = indexPath.toFile()
@@ -280,11 +299,9 @@ class DBManager(private val indexDirectoryName: String = "database") {
 
             try {
                 if (!oldIndexDir.exists() || isFirstIndexCreation) {
-                    // No existing database or first-time creation
                     println("No existing index found or first-time index creation. Copying new index to the main directory.")
                     copyDirectory(newIndexPath, indexPath)
                 } else {
-                    // Handle replacing old index
                     println("Deleting old index directory: ${oldIndexDir.absolutePath}")
                     if (!deleteDirectory(oldIndexDir)) {
                         throw IOException("Failed to delete the old index directory.")
@@ -294,7 +311,6 @@ class DBManager(private val indexDirectoryName: String = "database") {
                     copyDirectory(newIndexPath, indexPath)
                 }
 
-                // Reinitialize the index directory for future use
                 indexDirectory.close()
                 indexWriter = null
                 indexDirectory = FSDirectory.open(indexPath)
@@ -302,23 +318,19 @@ class DBManager(private val indexDirectoryName: String = "database") {
 
                 println("Index replacement completed.")
             } finally {
-                // Clean up temporary directory
                 println("Cleaning up temporary directory: ${tempDir.absolutePath}")
                 try {
-                    // First ensure all file handles are closed by forcing a GC
                     System.gc()
-                    Thread.sleep(100) // Give the system a moment to release resources
+                    Thread.sleep(100)
 
                     if (deleteDirectory(tempDir)) {
                         println("Temporary directory successfully deleted")
                     } else {
                         println("Warning: Could not delete temporary directory immediately")
-                        // Schedule deletion for JVM exit as a fallback
                         tempDir.deleteOnExit()
                     }
                 } catch (e: Exception) {
                     println("Warning: Error while cleaning up temporary directory: ${e.message}")
-                    // Schedule deletion for JVM exit as a fallback
                     tempDir.deleteOnExit()
                 }
             }
@@ -329,12 +341,6 @@ class DBManager(private val indexDirectoryName: String = "database") {
         }
     }
 
-
-
-
-    /**
-     * Copies the contents of a directory recursively.
-     */
     private fun copyDirectory(source: Path, target: Path) {
         try {
             Files.walk(source).forEach { file ->
@@ -351,9 +357,6 @@ class DBManager(private val indexDirectoryName: String = "database") {
         }
     }
 
-    /**
-     * Deletes a directory and its contents recursively.
-     */
     private fun deleteDirectory(directory: File): Boolean {
         return directory.walkBottomUp().all { it.delete() }
     }

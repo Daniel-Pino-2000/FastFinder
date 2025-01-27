@@ -7,7 +7,10 @@ class SystemItem(
     var itemPath: String,
 
     // Boolean flag indicating whether the item is a file (true) or a folder (false)
-    var isFile: Boolean
+    var isFile: Boolean,
+
+    // Size of the item in bytes
+    var itemSize: Long
 ) {
 
 }
