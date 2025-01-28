@@ -16,13 +16,21 @@ import java.io.File
 
 // Displays each item in the list with hover effect
 @Composable
-fun LazyListItem(item: SystemItem, resultMode: SearchFilter) {
+fun LazyListItem(item: SystemItem, searchMode: SearchMode, resultMode: SearchFilter) {
 
     var isHovered by remember { mutableStateOf(false) } // State to track hover
     val fileType : SearchFilter = getFileType(File(item.itemPath))
 
     // Only display the item if it matches the resultMode or if resultMode is ALL
     if (resultMode != SearchFilter.ALL && fileType != resultMode) {
+        return
+    }
+
+    if (item.isFile && searchMode == SearchMode.DIRECTORIES) {
+        return
+    }
+
+    else if (!item.isFile && searchMode == SearchMode.FILES) {
         return
     }
 

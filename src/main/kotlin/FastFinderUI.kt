@@ -83,7 +83,6 @@ fun FastFinderApp(dbManager: DBManager) {
         testList = emptyList()
         testList = testList + Search(
             searchValue = searchValue,
-            searchMode = searchMode,
             customSearchDirectory = customDir,
             dbManager
         ).search()
@@ -343,7 +342,7 @@ fun FastFinderApp(dbManager: DBManager) {
                         .fillMaxHeight() // Match the height of the Box
                 ) {
                     items(testList) { item ->
-                        LazyListItem(item, resultMode) // Composable for individual items
+                        LazyListItem(item, searchMode, resultMode) // Composable for individual items
                     }
                 }
 

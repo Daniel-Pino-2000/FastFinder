@@ -10,7 +10,6 @@ import javax.swing.JOptionPane
 
 class Search(
     private val searchValue: String,
-    private val searchMode: SearchMode,
     private val customSearchDirectory: File? = null, // Accepts File for custom search directory
     private val dbManager: DBManager = DBManager()
 ) {
@@ -138,11 +137,8 @@ class Search(
                     }
 
                     if (allTermsMatch) {
-                        when (searchMode) {
-                            SearchMode.FILES -> if (isFile) foundItems.add(SystemItem(itemName, itemPath, isFile, size))
-                            SearchMode.DIRECTORIES -> if (!isFile) foundItems.add(SystemItem(itemName, itemPath, isFile, size))
-                            SearchMode.ALL -> foundItems.add(SystemItem(itemName, itemPath, isFile, size))
-                        }
+                            if (isFile) foundItems.add(SystemItem(itemName, itemPath, isFile, size))
+                            if (!isFile) foundItems.add(SystemItem(itemName, itemPath, isFile, size))
                     }
                 }
             }
@@ -177,9 +173,8 @@ class Search(
                         val fileName = file.fileName.toString().lowercase()
                         if (matchesSearchCriteria(fileName, searchTerms)) {
                             val item = createSystemItem(file, attrs, isFile = true)
-                            if (searchMode == SearchMode.FILES || searchMode == SearchMode.ALL) {
-                                matchingItems.add(item)
-                            }
+                            matchingItems.add(item)
+
                         }
                     } catch (e: AccessDeniedException) {
                         println("Access denied to file: $file")
@@ -194,9 +189,8 @@ class Search(
                         val dirName = dir.fileName.toString().lowercase()
                         if (matchesSearchCriteria(dirName, searchTerms)) {
                             val item = createSystemItem(dir, attrs, isFile = false)
-                            if (searchMode == SearchMode.DIRECTORIES || searchMode == SearchMode.ALL) {
-                                matchingItems.add(item)
-                            }
+                            matchingItems.add(item)
+
                         }
                     } catch (e: AccessDeniedException) {
                         println("Access denied to directory: $dir")
