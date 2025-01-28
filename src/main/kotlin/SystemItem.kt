@@ -10,7 +10,7 @@ class SystemItem(
     var isFile: Boolean,
 
     // Size of the item in bytes
-    var itemSize: Long
+    var itemSize: Long?
 ) {
 
 }

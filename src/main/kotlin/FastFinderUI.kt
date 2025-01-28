@@ -61,6 +61,10 @@ fun FastFinderApp(dbManager: DBManager) {
     var endTime: Long // Variable used to record the end time
     var elapsedTime by remember { mutableStateOf(0.0) } // Calculate elapsed time in seconds
 
+    // State for custom search dialog
+    var showCustomSearchDialog by remember { mutableStateOf(false) }
+    var selectedDirectory by remember { mutableStateOf<File?>(null) }
+
 
     // Wrap the AtomicBoolean in a MutableState
     var isIndexing by remember { mutableStateOf(dbManager.isIndexing.get()) }
@@ -80,13 +84,57 @@ fun FastFinderApp(dbManager: DBManager) {
         testList = testList + Search(
             searchValue = searchValue,
             searchMode = searchMode,
-            customRootDirectory = customDir,
+            customSearchDirectory = customDir,
             dbManager
         ).search()
         searchValue = ""
         endTime = System.nanoTime()
         elapsedTime = (endTime - startTime) / 1_000_000_000.0
     }
+
+    // Custom Search Dialog
+    if (showCustomSearchDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showCustomSearchDialog = false // Close the dialog
+            },
+            title = {
+                Text(text = "Enter Search Query")
+            },
+            text = {
+                Column {
+                    TextField(
+                        value = searchValue,
+                        onValueChange = { searchValue = it },
+                        singleLine = true,
+                        label = { Text("Search Query") }
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showCustomSearchDialog = false // Close the dialog
+                        selectedDirectory?.let { dir ->
+                            performSearch(dir) // Perform the search with the selected directory
+                        }
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = {
+                        showCustomSearchDialog = false // Close the dialog
+                    }
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
 
     // Material theme for styling UI components
     MaterialTheme {
@@ -352,19 +400,13 @@ fun FastFinderApp(dbManager: DBManager) {
                     // Custom Search Button
                     Button(
                         onClick = {
-                            /*
-                           // Open the directory picker
-                           val selectedDirectory = showDirectoryPicker()
-
-                           // If a directory is selected, perform the custom search
-                           selectedDirectory?.let { dir ->
-                               performSearch(dir) // Perform the search in the selected directory
-                           } ?: run {
-                               // Show an error message if no directory is selected
-                               println("No directory selected or invalid directory.")
-                           }
-
-                            */
+                            // Open the directory picker
+                            selectedDirectory = showDirectoryPicker()
+                            if (selectedDirectory != null) {
+                                showCustomSearchDialog = true // Show the custom search dialog
+                            } else {
+                                println("No directory selected or invalid directory.")
+                            }
                         },
                         shape = RoundedCornerShape(5.dp),
                         colors = ButtonDefaults.buttonColors(
@@ -375,6 +417,7 @@ fun FastFinderApp(dbManager: DBManager) {
                     ) {
                         Text(text = "Custom Search")
                     }
+                }
 
                     Spacer(modifier = Modifier.width(8.dp))
 
@@ -404,5 +447,4 @@ fun FastFinderApp(dbManager: DBManager) {
                 }
             }
         }
-    }
 }

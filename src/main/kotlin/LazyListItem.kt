@@ -19,7 +19,7 @@ import java.io.File
 fun LazyListItem(item: SystemItem, resultMode: SearchFilter) {
 
     var isHovered by remember { mutableStateOf(false) } // State to track hover
-    var fileType : SearchFilter = getFileType(File(item.itemPath))
+    val fileType : SearchFilter = getFileType(File(item.itemPath))
 
     // Only display the item if it matches the resultMode or if resultMode is ALL
     if (resultMode != SearchFilter.ALL && fileType != resultMode) {
@@ -41,8 +41,7 @@ fun LazyListItem(item: SystemItem, resultMode: SearchFilter) {
     }
 
     // Calculate and format the size
-    val file = File(item.itemPath)
-    val size = formatSize(item.itemSize)
+    val size = item.itemSize?.let { formatSize(it) }
 
     Row(modifier = Modifier.pointerInput(Unit) {
         // Detect hover using PointerEventType
@@ -71,10 +70,13 @@ fun LazyListItem(item: SystemItem, resultMode: SearchFilter) {
         )
 
         // Display the size
-        Text(
-            text = size,
-            modifier = Modifier.padding(8.dp)
-        )
+        if (size != null) {
+            Text(
+                text = size,
+                modifier = Modifier.padding(8.dp)
+            )
+        }
+
 
         if (isHovered) { // Displays the clickable icon if it is hovered
             // If clicked, open the location of the file or the folder
