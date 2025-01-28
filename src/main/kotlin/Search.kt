@@ -92,6 +92,7 @@ class Search(
         )
     }
 
+    // Performs the search in the database.
     private fun performSearch(): List<SystemItem> {
         val searchTerms = searchValue.trim().lowercase().split(" ").filter { it.isNotEmpty() }
         println("Search initiated with terms: $searchTerms")

@@ -21,11 +21,10 @@ fun LazyListItem(item: SystemItem, searchMode: SearchMode, resultMode: SearchFil
     var isHovered by remember { mutableStateOf(false) } // State to track hover
     val fileType : SearchFilter = getFileType(File(item.itemPath))
 
-    // Only display the item if it matches the resultMode or if resultMode is ALL
+    // Only display the item if it matches the resultMode and the searchMode
     if (resultMode != SearchFilter.ALL && fileType != resultMode) {
         return
     }
-
     if (item.isFile && searchMode == SearchMode.DIRECTORIES) {
         return
     }
@@ -34,7 +33,7 @@ fun LazyListItem(item: SystemItem, searchMode: SearchMode, resultMode: SearchFil
         return
     }
 
-    // Determine icon for file or folder
+    // Determine icon for the type of file or folder
     val icon: ImageVector = if (item.isFile) {
         when (getFileType(File(item.itemPath))) {
             SearchFilter.ALL -> ThemeElements().fileIcon
@@ -48,7 +47,7 @@ fun LazyListItem(item: SystemItem, searchMode: SearchMode, resultMode: SearchFil
         ThemeElements().folderIcon // Assign folder icon to `icon`
     }
 
-    // Calculate and format the size
+    // Formats the size
     val size = item.itemSize?.let { formatSize(it) }
 
     Row(modifier = Modifier.pointerInput(Unit) {

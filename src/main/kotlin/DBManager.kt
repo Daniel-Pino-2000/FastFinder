@@ -48,6 +48,7 @@ class DBManager(indexDirectoryName: String = "database") {
         println("IndexPath: $indexPath")
     }
 
+    // Loads the configurations of the search.
     private fun readStateFile(): Boolean {
         return if (Files.exists(stateFilePath)) {
             try {
@@ -62,6 +63,7 @@ class DBManager(indexDirectoryName: String = "database") {
         }
     }
 
+    // Saves the configurations of the search.
     private fun writeStateFile() {
         try {
             Files.write(stateFilePath, listOf(isFirstIndexCreation.toString(), indexPath.toString()),
@@ -70,6 +72,7 @@ class DBManager(indexDirectoryName: String = "database") {
             println("Error writing state file: ${e.message}")
         }
     }
+
 
     private fun getIndexWriter(): IndexWriter {
         lock.lock()
@@ -103,14 +106,17 @@ class DBManager(indexDirectoryName: String = "database") {
         }
     }
 
+    // Creates or updates the index, depending on the current state
     fun createOrUpdateIndex(forceIndexCreation: Boolean = false) {
         println("Checking if index exists before updating or creating: ${indexExists()}")
 
+        // Prevent multiple indexing processes from running simultaneously
         if (isIndexing.get()) {
             println("Indexing is already in progress. Skipping this request.")
             return
         }
 
+        // Decide whether to proceed with creating or updating the index
         if (forceIndexCreation || isFirstIndexCreation || !indexExists()) {
             isIndexing.set(true)
             var tempDirectory: Path? = null
@@ -119,22 +125,27 @@ class DBManager(indexDirectoryName: String = "database") {
                 try {
                     println("Starting indexing process...")
 
+                    // Create a temporary directory for the new index
                     tempDirectory = Files.createTempDirectory("new_index_")
                     val newIndexPath = tempDirectory!!.toAbsolutePath()
                     println("Temporary new index directory: $newIndexPath")
 
+                    // Open the temporary directory as a new Lucene index
                     FSDirectory.open(newIndexPath).use { newIndexDir ->
                         val indexWriterConfig = IndexWriterConfig(analyzer)
                         IndexWriter(newIndexDir, indexWriterConfig).use { writer ->
+                            // Index files and directories
                             indexFilesAndDirectories(writer)
                             writer.commit()
                         }
                     }
 
                     println("\nIndexing completed. Total items indexed: $totalIndexed")
+                    // Replace the old index with the new one
                     replaceOldIndexWithNew(newIndexPath)
                     isDeletingFile = false
 
+                    // Update the state to indicate that the first index creation is complete
                     if (isFirstIndexCreation) {
                         println("Setting isFirstIndexCreation to false.")
                         isFirstIndexCreation = false
@@ -169,7 +180,7 @@ class DBManager(indexDirectoryName: String = "database") {
     }
 
     private fun indexFilesAndDirectories(indexWriter: IndexWriter) {
-        val roots = listOf(File("C:\\"))
+        val roots = File.listRoots().toList()
         val executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors())
 
         // Use a thread-safe map to store directory sizes
@@ -274,6 +285,7 @@ class DBManager(indexDirectoryName: String = "database") {
         }
     }
 
+
     private fun isRestrictedDirectory(path: Path): Boolean {
         val restrictedDirs = setOf(
             "\$Recycle.Bin",
@@ -286,6 +298,7 @@ class DBManager(indexDirectoryName: String = "database") {
         val pathStr = path.toString().lowercase()
         return restrictedDirs.any { restricted -> pathStr.contains(restricted.lowercase()) }
     }
+
 
     private fun replaceOldIndexWithNew(newIndexPath: Path) {
         isDeletingFile = true
