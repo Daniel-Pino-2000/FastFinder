@@ -254,7 +254,8 @@ fun FastFinderApp(dbManager: DBManager) {
                             backgroundColor = themeElements.buttonColor,
                             contentColor = Color.White
                         ),
-                        modifier = Modifier.height(56.dp).padding(end = 12.dp)
+                        modifier = Modifier.height(56.dp).padding(end = 12.dp),
+                        enabled = searchFilter != "Folders"
                     ) {
                         Text(text = resultFilter)
                         Icon(Icons.Default.ArrowDropDown, contentDescription = null)
