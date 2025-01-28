@@ -3,7 +3,7 @@
 1. [Features](#features)
 2. [Usage](#usage)
 3. [Screenshots](#screenshots)
-4. [About the Developer] (#about me)
+4. [About the Developer] (#aboutme)
 ---
 
 # FastFinder
