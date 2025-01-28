@@ -1,9 +1,9 @@
 ## Index
 
 1. [Features](#features)
-2. [Installation](#installation)
-3. [Usage](#usage)
-4. [Screenshots](#screenshots)
+2. [Usage](#usage)
+3. [Screenshots](#screenshots)
+4. [About the Developer] (#about me)
 ---
 
 # FastFinder
