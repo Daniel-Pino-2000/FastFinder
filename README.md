@@ -1,82 +1,77 @@
 # FastFinder
 
-**FastFinder** is a Windows application that helps you quickly search files and folders within your computer's internal storage. It indexes your files in the background, allowing you to perform searches even while the index is being updated. With customizable search features and the ability to filter results, FastFinder makes it easy to find exactly what you're looking for.
+FastFinder is an app designed to search files and folders in the internal storage of a Windows computer. The app indexes the storage on the first run and allows users to perform searches with several powerful features.
+
+---
 
 ## Features
 
-- **File and Folder Search**: Easily search through files and folders in your computer’s internal storage.
-- **Background Indexing**: On the first run, FastFinder creates a database of files and folders in the background.
-- **Live Search During Indexing**: Even while the index is being updated, you can still search using the old database.
-- **Custom Directory Search**: Perform searches within specific directories while the database is being indexed or updated.
-- **Filters for File Types and Folders**: Narrow down your search by filtering for files or folders.
-- **File Search Filters**: Additional filters for file searches based on extensions, size, date, etc.
+- **Indexing on First Run**: On the first launch, FastFinder automatically indexes your files and folders in the background. Once the initial index is created, you can perform searches without waiting for the indexing process to complete.
+  
+- **Database Updates**: After the initial index, you can update the database. While the database is being updated, you can continue searching using the previously indexed data.
 
-## Screenshots
+- **Custom Directory Search**: FastFinder allows users to perform custom searches in specific directories, even while indexing or updating the database.
 
-![FastFinder Screenshot 1](path/to/screenshot1.png)
-*Search Interface*
+- **Filters for Files and Folders**: You can filter your search results by files or folders.
 
-![FastFinder Screenshot 2](path/to/screenshot2.png)
-*Search Results with Filters*
+- **Advanced File Filters**: When searching for files, you can apply additional filters to narrow down the search results, such as file type or size.
+
+---
 
 ## Installation
 
+Follow these steps to install FastFinder on your Windows machine:
+
 ### Prerequisites
 
-Make sure you have the following installed:
-- Windows 10 or later
-- .NET Framework (if applicable) or the required dependencies for your app
+- Windows Operating System
+- .NET Framework (or other required dependencies depending on your app's requirements)
 
 ### Steps
 
-1. **Download the Latest Release**
-   - Go to the [FastFinder Releases](https://github.com/yourusername/FastFinder/releases) page.
-   - Download the latest version of the `.exe` file.
+1. **Download the latest release** from the [Releases page](https://github.com/your-username/FastFinder/releases).
+2. **Extract the ZIP file** (if applicable) to a folder of your choice.
+3. **Run the executable** `FastFinder.exe` to launch the application.
 
-2. **Run the Installer**
-   - Double-click the downloaded file to run the installer.
-   - Follow the prompts to complete the installation process.
-
-3. **Launch the Application**
-   - After installation, open FastFinder from your Start menu or desktop shortcut.
-   - On the first run, the app will automatically index your files in the background.
+---
 
 ## Usage
 
-1. **First Run: Indexing Database**
-   - The first time you run FastFinder, it will index your computer’s files and folders in the background. This may take some time, depending on the size of your storage.
+1. On the **first launch**, FastFinder will start indexing your files and folders. This may take some time, depending on the size of your storage.
+2. Once the initial index is complete, you can begin performing searches.
+3. To update the database, simply select the **Update Database** option from the menu. While updating, you can still search using the previously indexed data.
+4. Use the **Custom Search** feature to search within specific directories. You can specify the folder you want to search in while indexing or updating the database.
 
-2. **Search Files or Folders**
-   - Once the database is created, you can use the search bar to find files or folders. FastFinder will display results as you type.
+---
 
-3. **Custom Search**
-   - To search in a specific directory, go to the **Custom Search** tab.
-   - Select the directory you want to search within, and enter your search query.
+## Screenshots
 
-4. **Filters**
-   - Use the filter options to narrow down results. You can filter by:
-     - **Files or Folders**
-     - **File Type (e.g., .txt, .jpg, etc.)**
-     - **File Size**
-     - **Date Modified**
-     
-5. **Updating the Database**
-   - To update the database, click the **Update Database** button. While the database is being updated, you can still search using the old index.
+### Main Screen
+
+![Main Screen](images/main-screen.png)
+
+### Search Results
+
+![Search Results](images/search-results.png)
+
+---
+
+## Index
+
+1. [Features](#features)
+2. [Installation](#installation)
+3. [Usage](#usage)
+4. [Screenshots](#screenshots)
+
+---
 
 ## Contributing
 
-1. Fork the repository.
-2. Create a new branch (`git checkout -b feature/your-feature`).
-3. Make your changes.
-4. Commit your changes (`git commit -am 'Add your feature'`).
-5. Push to the branch (`git push origin feature/your-feature`).
-6. Create a new Pull Request.
+Feel free to fork this repository, make changes, and submit pull requests. Please ensure that your changes don't break existing functionality, and remember to include tests where applicable.
+
+---
 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-Thank you for using FastFinder! If you encounter any issues or have suggestions for new features, feel free to open an issue or contribute to the project.
 
