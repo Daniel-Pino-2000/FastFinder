@@ -254,23 +254,13 @@ fun FastFinderApp(dbManager: DBManager) {
                             contentColor = Color.White
                         ),
                         modifier = Modifier.height(56.dp).padding(end = 12.dp),
-                        enabled = searchFilter != "Folders"
+                        enabled = searchFilter != "Folders" && searchMode != SearchMode.ALL
                     ) {
                         Text(text = resultFilter)
                         Icon(Icons.Default.ArrowDropDown, contentDescription = null)
                     }
 
                     DropdownMenu(expanded = filterExpanded, onDismissRequest = { filterExpanded = false }) {
-
-                        DropdownMenuItem(
-                            onClick = {
-                                resultFilter = "All"
-                                resultMode = SearchFilter.ALL
-                                filterExpanded = false
-                            }
-                        ) {
-                            Text("All")
-                        }
 
                         DropdownMenuItem(
                             onClick = {

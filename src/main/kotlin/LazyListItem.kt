@@ -22,29 +22,27 @@ fun LazyListItem(item: SystemItem, searchMode: SearchMode, resultMode: SearchFil
     val fileType : SearchFilter = getFileType(File(item.itemPath))
 
     // Only display the item if it matches the resultMode and the searchMode
-    if (item.isFile && searchMode == SearchMode.DIRECTORIES) {
-        return
-    }
-
-    else if (!item.isFile && searchMode == SearchMode.FILES) {
-        return
-    }
-
-    else {
-        if (resultMode != SearchFilter.ALL && fileType != resultMode && searchMode != SearchMode.DIRECTORIES) { // If the searchMode is Folders then don't apply the files filter.
+    if (searchMode != SearchMode.ALL) {
+        if (item.isFile && searchMode == SearchMode.DIRECTORIES) {
+            return
+        } else if (!item.isFile && searchMode == SearchMode.FILES) {
+            return
+        } else if (resultMode != SearchFilter.ALL && fileType != resultMode && searchMode != SearchMode.DIRECTORIES) {
+            // If the searchMode is Folders then don't apply the files filter.
             return
         }
     }
 
+
     // Determine icon for the type of file or folder
     val icon: ImageVector = if (item.isFile) {
         when (getFileType(File(item.itemPath))) {
-            SearchFilter.ALL -> ThemeElements().fileIcon
             SearchFilter.IMAGE -> ThemeElements().imageFileIcon
             SearchFilter.VIDEO -> ThemeElements().videoFileIcon
             SearchFilter.DOCUMENT -> ThemeElements().documentFileIcon
             SearchFilter.AUDIO -> ThemeElements().audioFileIcon
             SearchFilter.EXECUTABLE -> ThemeElements().executableFileIcon
+            else -> {ThemeElements().fileIcon}
         }
     } else {
         ThemeElements().folderIcon // Assign folder icon to `icon`
