@@ -1,3 +1,11 @@
+## Index
+
+1. [Features](#features)
+2. [Installation](#installation)
+3. [Usage](#usage)
+4. [Screenshots](#screenshots)
+---
+
 # FastFinder
 
 FastFinder is an app designed to search files and folders in the internal storage of a Windows computer. The app indexes the storage on the first run and allows users to perform searches with several powerful features.
@@ -37,8 +45,8 @@ Follow these steps to install FastFinder on your Windows machine:
 
 ## Usage
 
-1. On the **first launch**, FastFinder will start indexing your files and folders. This may take some time, depending on the size of your storage.
-2. Once the initial index is complete, you can begin performing searches.
+1. On the **first launch**, FastFinder will start indexing your files and folders. This may take some time, depending on the size of your storage but a custom search can be performed while indexing.
+2. Once the initial index is complete, you can begin performing searches on the database which will be way faster than a custom search.
 3. To update the database, simply select the **Update Database** option from the menu. While updating, you can still search using the previously indexed data.
 4. Use the **Custom Search** feature to search within specific directories. You can specify the folder you want to search in while indexing or updating the database.
 
@@ -55,23 +63,7 @@ Follow these steps to install FastFinder on your Windows machine:
 ![Search Results](images/search-results.png)
 
 ---
+## About the Developer
 
-## Index
-
-1. [Features](#features)
-2. [Installation](#installation)
-3. [Usage](#usage)
-4. [Screenshots](#screenshots)
-
----
-
-## Contributing
-
-Feel free to fork this repository, make changes, and submit pull requests. Please ensure that your changes don't break existing functionality, and remember to include tests where applicable.
-
----
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
+Developed by **Daniel Pino**.  
+Check out my other projects on [GitHub](https://github.com/Daniel-Pino-2000)!  
