@@ -1,3 +1,6 @@
+# Ignore the 'database' folder
+/database/
+
 .gradle
 build/
 !gradle/wrapper/gradle-wrapper.jar
