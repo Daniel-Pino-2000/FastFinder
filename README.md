@@ -26,23 +26,6 @@ FastFinder is an app designed to search files and folders in the internal storag
 
 ---
 
-## Installation
-
-Follow these steps to install FastFinder on your Windows machine:
-
-### Prerequisites
-
-- Windows Operating System
-- .NET Framework (or other required dependencies depending on your app's requirements)
-
-### Steps
-
-1. **Download the latest release** from the [Releases page](https://github.com/your-username/FastFinder/releases).
-2. **Extract the ZIP file** (if applicable) to a folder of your choice.
-3. **Run the executable** `FastFinder.exe` to launch the application.
-
----
-
 ## Usage
 
 1. On the **first launch**, FastFinder will start indexing your files and folders. This may take some time, depending on the size of your storage but a custom search can be performed while indexing.
