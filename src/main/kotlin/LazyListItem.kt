@@ -22,15 +22,18 @@ fun LazyListItem(item: SystemItem, searchMode: SearchMode, resultMode: SearchFil
     val fileType : SearchFilter = getFileType(File(item.itemPath))
 
     // Only display the item if it matches the resultMode and the searchMode
-    if (resultMode != SearchFilter.ALL && fileType != resultMode) {
-        return
-    }
     if (item.isFile && searchMode == SearchMode.DIRECTORIES) {
         return
     }
 
     else if (!item.isFile && searchMode == SearchMode.FILES) {
         return
+    }
+
+    else {
+        if (resultMode != SearchFilter.ALL && fileType != resultMode && searchMode != SearchMode.DIRECTORIES) { // If the searchMode is Folders then don't apply the files filter.
+            return
+        }
     }
 
     // Determine icon for the type of file or folder
@@ -113,15 +116,20 @@ fun getFileType(file: File): SearchFilter {
     val extension = file.extension.lowercase()
     return when (extension) {
         // Video formats
-        "mp4", "mkv", "avi", "mov", "wmv", "flv", "webm" -> SearchFilter.VIDEO
+        "mp4", "mkv", "avi", "mov", "wmv", "flv", "webm", "mpeg", "mpg", "m4v", "3gp", "3g2", "vob", "ogv", "m2ts", "ts", "mts", "rm", "rmvb", "asf", "divx" -> SearchFilter.VIDEO
+
         // Audio formats
-        "mp3", "wav", "aac", "flac", "ogg", "m4a" -> SearchFilter.AUDIO
+        "mp3", "wav", "aac", "flac", "ogg", "m4a", "wma", "alac", "aiff", "opus", "amr", "mid", "midi", "ac3", "ape", "au", "ra", "mka", "tta", "dts" -> SearchFilter.AUDIO
+
         // Image formats
-        "jpg", "jpeg", "png", "gif", "bmp", "webp", "svg" -> SearchFilter.IMAGE
+        "jpg", "jpeg", "png", "gif", "bmp", "webp", "svg", "tiff", "tif", "ico", "heic", "heif", "psd", "raw", "cr2", "nef", "orf", "sr2", "ai", "eps", "jfif", "pbm", "pgm", "ppm" -> SearchFilter.IMAGE
+
         // Document formats
-        "pdf", "doc", "docx", "txt", "xls", "xlsx", "ppt", "pptx", "odt", "rtf" -> SearchFilter.DOCUMENT
+        "pdf", "doc", "docx", "txt", "xls", "xlsx", "ppt", "pptx", "odt", "rtf", "csv", "tex", "md", "odp", "ods", "epub", "mobi", "azw", "fb2", "djvu", "xps", "oxps", "log", "pages", "numbers", "key", "dot", "dotx", "pps", "ppsx" -> SearchFilter.DOCUMENT
+
         // Executable formats
-        "exe", "msi", "bat", "sh", "app", "apk" -> SearchFilter.EXECUTABLE
+        "exe", "msi", "bat", "sh", "app", "apk", "jar", "dmg", "pkg", "deb", "rpm", "run", "bin", "com", "gadget", "wsf", "cgi", "ipa", "xap", "vb", "vbs", "out", "elf", "dll", "so", "class" -> SearchFilter.EXECUTABLE
+
         // Default case
         else -> SearchFilter.ALL
     }

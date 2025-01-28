@@ -129,7 +129,6 @@ class Search(
                 val isFile = doc.get("isFile")?.toBoolean() ?: false
                 val size = doc.get("sizeDisplay")?.toLongOrNull() ?: 0L // Handle missing or null size
 
-                println("Match found: name='$itemName', path='$itemPath', score=${scoreDoc.score}")
 
                 if (itemName != null && itemPath != null) {
                     // Check if all search terms are present in the item name
