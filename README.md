@@ -56,7 +56,7 @@ Follow these steps to install FastFinder on your Windows machine:
 
 ### Main Screen
 
-![Main Screen](images/main-screen.png)
+![Main Screen](images/main.png)
 
 ### Search Results
 
