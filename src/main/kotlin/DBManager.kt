@@ -17,7 +17,7 @@ import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.thread
 import kotlin.io.AccessDeniedException
 
-class DBManager(private val indexDirectoryName: String = "database") {
+class DBManager(indexDirectoryName: String = "database") {
     private val analyzer = StandardAnalyzer()
     private var totalIndexed = 0
     val skippedPaths = mutableListOf<String>()
@@ -194,16 +194,16 @@ class DBManager(private val indexDirectoryName: String = "database") {
                                     currentDir = currentDir.parent
                                 }
                             } catch (e: AccessDeniedException) {
-                                skippedPaths.add("File: ${file} (Access Denied)")
+                                skippedPaths.add("File: $file (Access Denied)")
                             } catch (e: Exception) {
-                                skippedPaths.add("File: ${file} (${e.message})")
+                                skippedPaths.add("File: $file (${e.message})")
                             }
                             return FileVisitResult.CONTINUE
                         }
 
                         override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
                             if (isRestrictedDirectory(dir)) {
-                                skippedPaths.add("Directory: ${dir} (Restricted)")
+                                skippedPaths.add("Directory: $dir (Restricted)")
                                 return FileVisitResult.SKIP_SUBTREE
                             }
 
@@ -211,10 +211,10 @@ class DBManager(private val indexDirectoryName: String = "database") {
                                 // Initialize directory size to 0 atomically
                                 directorySizes.putIfAbsent(dir, AtomicLong(0))
                             } catch (e: AccessDeniedException) {
-                                skippedPaths.add("Directory: ${dir} (Access Denied)")
+                                skippedPaths.add("Directory: $dir (Access Denied)")
                                 return FileVisitResult.SKIP_SUBTREE
                             } catch (e: Exception) {
-                                skippedPaths.add("Directory: ${dir} (${e.message})")
+                                skippedPaths.add("Directory: $dir (${e.message})")
                                 return FileVisitResult.SKIP_SUBTREE
                             }
                             return FileVisitResult.CONTINUE
@@ -222,7 +222,7 @@ class DBManager(private val indexDirectoryName: String = "database") {
 
                         override fun postVisitDirectory(dir: Path, exc: IOException?): FileVisitResult {
                             if (exc != null) {
-                                skippedPaths.add("Directory: ${dir} (${exc.message})")
+                                skippedPaths.add("Directory: $dir (${exc.message})")
                                 return FileVisitResult.CONTINUE
                             }
 
@@ -233,7 +233,7 @@ class DBManager(private val indexDirectoryName: String = "database") {
                         }
 
                         override fun visitFileFailed(file: Path, exc: IOException): FileVisitResult {
-                            skippedPaths.add("Failed to access: ${file} (${exc.message})")
+                            skippedPaths.add("Failed to access: $file (${exc.message})")
                             return FileVisitResult.CONTINUE
                         }
                     })

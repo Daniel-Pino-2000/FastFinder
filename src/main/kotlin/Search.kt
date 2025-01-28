@@ -137,8 +137,8 @@ class Search(
                     }
 
                     if (allTermsMatch) {
-                            if (isFile) foundItems.add(SystemItem(itemName, itemPath, isFile, size))
-                            if (!isFile) foundItems.add(SystemItem(itemName, itemPath, isFile, size))
+                            if (isFile) foundItems.add(SystemItem(itemPath, isFile, size))
+                            if (!isFile) foundItems.add(SystemItem(itemPath, isFile, size))
                     }
                 }
             }
@@ -172,7 +172,7 @@ class Search(
                     try {
                         val fileName = file.fileName.toString().lowercase()
                         if (matchesSearchCriteria(fileName, searchTerms)) {
-                            val item = createSystemItem(file, attrs, isFile = true)
+                            val item = createSystemItem(file, isFile = true)
                             matchingItems.add(item)
 
                         }
@@ -188,7 +188,7 @@ class Search(
                     try {
                         val dirName = dir.fileName.toString().lowercase()
                         if (matchesSearchCriteria(dirName, searchTerms)) {
-                            val item = createSystemItem(dir, attrs, isFile = false)
+                            val item = createSystemItem(dir, isFile = false)
                             matchingItems.add(item)
 
                         }
@@ -226,9 +226,8 @@ class Search(
     /**
      * Creates a `SystemItem` object from a file or directory path.
      */
-    private fun createSystemItem(path: Path, attrs: BasicFileAttributes, isFile: Boolean): SystemItem {
+    private fun createSystemItem(path: Path, isFile: Boolean): SystemItem {
         return SystemItem(
-            itemName = path.fileName.toString(),
             itemPath = path.toAbsolutePath().toString(),
             isFile = isFile,
             // itemSize = if (isFile) attrs.size() else 0L // Directories have size 0

@@ -1,7 +1,6 @@
 // Class representing an item in the system (file or folder)
 class SystemItem(
     // Name of the item (file or folder)
-    var itemName: String,
 
     // Path to the item in the system
     var itemPath: String,
@@ -11,9 +10,7 @@ class SystemItem(
 
     // Size of the item in bytes
     var itemSize: Long?
-) {
-
-}
+)
 
 /**
  * Enum defining the different modes of search operation
