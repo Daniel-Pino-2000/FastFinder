@@ -37,6 +37,7 @@ fun FastFinderApp(dbManager: DBManager) {
 
     val coroutineScope = rememberCoroutineScope()
     val isIndexing by dbManager.isIndexing.collectAsState()
+    val lastError by dbManager.lastError.collectAsState()
 
     var searchQuery by remember { mutableStateOf("") }
     var searchMode by remember { mutableStateOf(SearchMode.ALL) }
@@ -60,6 +61,10 @@ fun FastFinderApp(dbManager: DBManager) {
 
     MaterialTheme {
         Column(modifier = Modifier.fillMaxSize().background(color = AppTheme.backgroundColor)) {
+            lastError?.let { message ->
+                ErrorBanner(message = message, onDismiss = dbManager::clearLastError)
+            }
+
             Spacer(modifier = Modifier.height(8.dp))
 
             SearchControls(
