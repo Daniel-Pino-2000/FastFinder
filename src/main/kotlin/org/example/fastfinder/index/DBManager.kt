@@ -16,20 +16,19 @@ import org.apache.lucene.store.FSDirectory
 import org.example.fastfinder.util.Logger
 import java.io.File
 import java.io.IOException
-import java.nio.file.FileVisitResult
+import java.nio.file.DirectoryIteratorException
 import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.nio.file.Path
 import java.nio.file.Paths
-import java.nio.file.SimpleFileVisitor
 import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
 import java.nio.file.attribute.BasicFileAttributes
 import java.util.Collections
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors
+import java.util.concurrent.ForkJoinPool
+import java.util.concurrent.RecursiveTask
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.thread
 import kotlin.io.AccessDeniedException
@@ -150,72 +149,94 @@ class DBManager(indexDirectoryName: String = "database") {
         false
     }
 
+    /**
+     * Walks every filesystem root in parallel using a fork-join, work-stealing pool:
+     * each directory is its own [RecursiveTask] that forks one child task per
+     * subdirectory. This keeps every worker thread busy even when there's only a
+     * single drive, unlike one-task-per-root, which leaves every thread but one idle
+     * on a typical single-drive machine.
+     *
+     * Each task returns the total size of its subtree so parent directories can sum
+     * their children's sizes directly, instead of every file walking back up through
+     * all of its ancestors to update a shared size map.
+     */
     private fun indexFilesAndDirectories(indexWriter: IndexWriter) {
         val roots = File.listRoots().toList()
-        val executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors())
-        val directorySizes = ConcurrentHashMap<Path, AtomicLong>()
-
-        roots.forEach { root ->
-            executor.submit {
-                val rootPath = root.toPath()
-                Logger.info("Walking directory tree from: ${rootPath.toAbsolutePath()}")
+        val pool = ForkJoinPool(Runtime.getRuntime().availableProcessors())
+        try {
+            val rootTasks = roots.map { root ->
+                Logger.info("Walking directory tree from: ${root.absolutePath}")
+                IndexDirectoryTask(root.toPath(), indexWriter).also(pool::execute)
+            }
+            rootTasks.forEach { task ->
                 try {
-                    Files.walkFileTree(rootPath, object : SimpleFileVisitor<Path>() {
-                        override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
-                            try {
-                                val fileSize = attrs.size()
-                                addToIndex(file, indexWriter, isFile = true, size = fileSize)
-
-                                var currentDir = file.parent
-                                while (currentDir != null) {
-                                    directorySizes.computeIfAbsent(currentDir) { AtomicLong(0) }.addAndGet(fileSize)
-                                    currentDir = currentDir.parent
-                                }
-                            } catch (e: AccessDeniedException) {
-                                skippedPaths.add("File: $file (Access Denied)")
-                            } catch (e: Exception) {
-                                skippedPaths.add("File: $file (${e.message})")
-                            }
-                            return FileVisitResult.CONTINUE
-                        }
-
-                        override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
-                            if (isRestrictedDirectory(dir)) {
-                                skippedPaths.add("Directory: $dir (Restricted)")
-                                return FileVisitResult.SKIP_SUBTREE
-                            }
-                            directorySizes.putIfAbsent(dir, AtomicLong(0))
-                            return FileVisitResult.CONTINUE
-                        }
-
-                        override fun postVisitDirectory(dir: Path, exc: IOException?): FileVisitResult {
-                            if (exc != null) {
-                                skippedPaths.add("Directory: $dir (${exc.message})")
-                                return FileVisitResult.CONTINUE
-                            }
-                            val dirSize = directorySizes[dir]?.get() ?: 0L
-                            addToIndex(dir, indexWriter, isFile = false, size = dirSize)
-                            return FileVisitResult.CONTINUE
-                        }
-
-                        override fun visitFileFailed(file: Path, exc: IOException): FileVisitResult {
-                            skippedPaths.add("Failed to access: $file (${exc.message})")
-                            return FileVisitResult.CONTINUE
-                        }
-                    })
+                    task.join()
                 } catch (e: Exception) {
-                    Logger.error("Error walking through root directory $root", e)
+                    Logger.error("Error walking through root directory", e)
                 }
             }
-        }
-
-        executor.shutdown()
-        try {
-            if (!executor.awaitTermination(1, TimeUnit.HOURS)) {
-                Logger.warn("Timeout waiting for indexing tasks to complete.")
+        } finally {
+            pool.shutdown()
+            try {
+                if (!pool.awaitTermination(1, TimeUnit.HOURS)) {
+                    Logger.warn("Timeout waiting for indexing tasks to complete.")
+                }
+            } catch (e: InterruptedException) {
+                Logger.warn("Indexing was interrupted: ${e.message}")
             }
-        } catch (e: InterruptedException) {
-            Logger.warn("Indexing was interrupted: ${e.message}")
+        }
+    }
+
+    /** Indexes [directory] and everything under it, returning the subtree's total size in bytes. */
+    private inner class IndexDirectoryTask(
+        private val directory: Path,
+        private val indexWriter: IndexWriter,
+    ) : RecursiveTask<Long>() {
+
+        override fun compute(): Long {
+            if (isRestrictedDirectory(directory)) {
+                skippedPaths.add("Directory: $directory (Restricted)")
+                return 0L
+            }
+
+            val entries = try {
+                Files.newDirectoryStream(directory).use { it.toList() }
+            } catch (e: AccessDeniedException) {
+                skippedPaths.add("Directory: $directory (Access Denied)")
+                return 0L
+            } catch (e: DirectoryIteratorException) {
+                skippedPaths.add("Directory: $directory (${e.cause?.message})")
+                return 0L
+            } catch (e: IOException) {
+                skippedPaths.add("Directory: $directory (${e.message})")
+                return 0L
+            }
+
+            var ownFilesSize = 0L
+            val subDirectoryTasks = mutableListOf<IndexDirectoryTask>()
+
+            for (entry in entries) {
+                val attrs = try {
+                    Files.readAttributes(entry, BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
+                } catch (e: AccessDeniedException) {
+                    skippedPaths.add("File: $entry (Access Denied)")
+                    continue
+                } catch (e: IOException) {
+                    skippedPaths.add("Failed to access: $entry (${e.message})")
+                    continue
+                }
+
+                if (attrs.isDirectory) {
+                    subDirectoryTasks.add(IndexDirectoryTask(entry, indexWriter).also { it.fork() })
+                } else {
+                    addToIndex(entry, indexWriter, isFile = true, size = attrs.size())
+                    ownFilesSize += attrs.size()
+                }
+            }
+
+            val subtreeSize = ownFilesSize + subDirectoryTasks.sumOf { it.join() }
+            addToIndex(directory, indexWriter, isFile = false, size = subtreeSize)
+            return subtreeSize
         }
     }
 
