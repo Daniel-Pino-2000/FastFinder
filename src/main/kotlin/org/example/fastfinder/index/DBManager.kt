@@ -13,6 +13,7 @@ import org.apache.lucene.index.DirectoryReader
 import org.apache.lucene.index.IndexWriter
 import org.apache.lucene.index.IndexWriterConfig
 import org.apache.lucene.store.FSDirectory
+import org.example.fastfinder.util.AppPaths
 import org.example.fastfinder.util.Logger
 import java.io.File
 import java.io.IOException
@@ -40,7 +41,7 @@ import kotlin.io.AccessDeniedException
  * into place once the new index has committed successfully, so [indexPath]
  * keeps serving searches from the previous index while a new one is built.
  */
-class DBManager(indexDirectoryName: String = "database") {
+class DBManager(indexDirectoryName: String = "database", baseDirectory: Path = AppPaths.root) {
     private val analyzer = StandardAnalyzer()
     private val totalIndexed = AtomicInteger(0)
     private val skippedPaths = Collections.synchronizedList(mutableListOf<String>())
@@ -56,8 +57,11 @@ class DBManager(indexDirectoryName: String = "database") {
     private val _isIndexing = MutableStateFlow(false)
     val isIndexing: StateFlow<Boolean> = _isIndexing.asStateFlow()
 
+    private val _lastError = MutableStateFlow<String?>(null)
+    val lastError: StateFlow<String?> = _lastError.asStateFlow()
+
     init {
-        indexPath = resolveAppDataDirectory().resolve(indexDirectoryName)
+        indexPath = baseDirectory.resolve(indexDirectoryName)
         stateFilePath = indexPath.resolve("index_state.txt")
 
         if (!Files.exists(indexPath)) {
@@ -89,6 +93,7 @@ class DBManager(indexDirectoryName: String = "database") {
                 Logger.info("Starting indexing process...")
                 totalIndexed.set(0)
                 skippedPaths.clear()
+                _lastError.value = null
 
                 tempDirectory = Files.createTempDirectory("fastfinder_index_")
                 val newIndexPath = tempDirectory.toAbsolutePath()
@@ -106,6 +111,7 @@ class DBManager(indexDirectoryName: String = "database") {
                 writeStateFile()
             } catch (e: Exception) {
                 Logger.error("Error during indexing", e)
+                _lastError.value = "Indexing failed: ${e.message ?: e::class.simpleName}"
                 tempDirectory?.let(::cleanUpTemporaryDirectory)
             } finally {
                 _isIndexing.value = false
@@ -115,10 +121,8 @@ class DBManager(indexDirectoryName: String = "database") {
         Logger.info("Indexing process started in the background.")
     }
 
-    private fun resolveAppDataDirectory(): Path {
-        val appData = System.getenv("APPDATA")
-        val base = if (appData != null) Paths.get(appData) else Paths.get(System.getProperty("user.home"))
-        return base.resolve("FastFinder")
+    fun clearLastError() {
+        _lastError.value = null
     }
 
     private fun readStateFile(): Boolean {
@@ -160,8 +164,7 @@ class DBManager(indexDirectoryName: String = "database") {
      * their children's sizes directly, instead of every file walking back up through
      * all of its ancestors to update a shared size map.
      */
-    private fun indexFilesAndDirectories(indexWriter: IndexWriter) {
-        val roots = File.listRoots().toList()
+    internal fun indexFilesAndDirectories(indexWriter: IndexWriter, roots: List<File> = File.listRoots().toList()) {
         val pool = ForkJoinPool(Runtime.getRuntime().availableProcessors())
         try {
             val rootTasks = roots.map { root ->
@@ -257,12 +260,32 @@ class DBManager(indexDirectoryName: String = "database") {
         if (count % 1000 == 0) Logger.info("Indexed $count items...")
     }
 
+    /**
+     * System directories to skip. The Windows and Program Files paths are resolved
+     * from environment variables rather than hardcoded, since they can be relocated
+     * (unattended installs, corporate imaging) and Windows-on-ARM adds a third
+     * "Program Files (Arm)" folder that a fixed literal list would miss.
+     *
+     * Matching is by exact path prefix ([Path.startsWith], which NIO's Windows
+     * provider already compares case-insensitively) or exact folder name for the
+     * per-drive reserved folders, not a substring search over the whole path -
+     * a substring check would also (wrongly) skip an unrelated folder that merely
+     * contains one of these words, e.g. "D:\ProgramFilesBackup".
+     */
+    private val restrictedRoots: List<Path> = listOfNotNull(
+        System.getenv("SystemRoot"),
+        System.getenv("windir"),
+        System.getenv("ProgramFiles"),
+        System.getenv("ProgramFiles(x86)"),
+        System.getenv("ProgramFiles(Arm)"),
+    ).mapNotNull { runCatching { Paths.get(it) }.getOrNull() }.distinct()
+
+    private val restrictedNames = setOf("\$recycle.bin", "system volume information")
+
     private fun isRestrictedDirectory(path: Path): Boolean {
-        val restrictedDirs = setOf(
-            "\$Recycle.Bin", "Windows", "Program Files", "Program Files (x86)", "System Volume Information"
-        )
-        val pathStr = path.toString().lowercase()
-        return restrictedDirs.any { pathStr.contains(it.lowercase()) }
+        val name = path.fileName?.toString()?.lowercase()
+        if (name != null && name in restrictedNames) return true
+        return restrictedRoots.any { path.startsWith(it) }
     }
 
     private fun replaceOldIndexWithNew(newIndexPath: Path) {
@@ -283,6 +306,7 @@ class DBManager(indexDirectoryName: String = "database") {
             Logger.info("Index replacement completed.")
         } catch (e: Exception) {
             Logger.error("Error finalizing index creation", e)
+            _lastError.value = "Failed to finalize the new index: ${e.message ?: e::class.simpleName}"
         } finally {
             cleanUpTemporaryDirectory(newIndexPath)
         }

@@ -27,6 +27,12 @@ dependencies {
     implementation("org.apache.lucene:lucene-core:7.1.0")  // core Lucene library
     implementation("org.apache.lucene:lucene-analyzers-common:7.1.0")  // for standard analyzers
     implementation("org.apache.lucene:lucene-queryparser:7.1.0")  // for query parsing
+
+    testImplementation(kotlin("test-junit5"))
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 

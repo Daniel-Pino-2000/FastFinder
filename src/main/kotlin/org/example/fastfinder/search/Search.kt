@@ -107,6 +107,7 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
         }
 
         val terms = query.toSearchTerms()
+        if (terms.isEmpty()) return emptyList()
         val matches = mutableListOf<SystemItem>()
 
         try {
