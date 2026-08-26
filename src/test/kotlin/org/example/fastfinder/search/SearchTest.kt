@@ -1,8 +1,15 @@
 package org.example.fastfinder.search
 
+import org.apache.lucene.analysis.standard.StandardAnalyzer
+import org.apache.lucene.index.IndexWriter
+import org.apache.lucene.index.IndexWriterConfig
+import org.apache.lucene.store.FSDirectory
 import org.example.fastfinder.index.DBManager
+import org.example.fastfinder.model.SearchFilter
+import org.example.fastfinder.model.SearchMode
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -78,5 +85,92 @@ class SearchTest {
         search.close()
 
         assertEquals(0, results.size)
+    }
+
+    @Test
+    fun `custom directory search honors search mode and result filter`(
+        @TempDir tempDir: Path,
+        @TempDir appDataDir: Path,
+    ) {
+        val root = tempDir.toFile()
+        File(root, "report.pdf").writeText("x")
+        File(root, "report.png").writeText("x")
+        File(root, "report_folder").mkdirs()
+
+        val search = Search(DBManager(indexDirectoryName = "test-index", baseDirectory = appDataDir))
+
+        val filesOnly = search.search("report", customSearchDirectory = root, searchMode = SearchMode.FILES)
+        assertEquals(setOf("report.pdf", "report.png"), filesOnly.map { it.itemPath.substringAfterLast(File.separatorChar) }.toSet())
+
+        val foldersOnly = search.search("report", customSearchDirectory = root, searchMode = SearchMode.DIRECTORIES)
+        assertEquals(listOf("report_folder"), foldersOnly.map { it.itemPath.substringAfterLast(File.separatorChar) })
+
+        val imagesOnly = search.search(
+            "report", customSearchDirectory = root, searchMode = SearchMode.FILES, resultFilter = SearchFilter.IMAGE
+        )
+        assertEquals(listOf("report.png"), imagesOnly.map { it.itemPath.substringAfterLast(File.separatorChar) })
+
+        search.close()
+    }
+
+    /** Builds a real Lucene index (bypassing [DBManager.createOrUpdateIndex], which always walks real drives) so [Search]'s indexed-search query logic can be exercised directly. */
+    private fun indexedSearchOver(baseDir: Path, root: File): Pair<DBManager, Search> {
+        val indexDir = baseDir.resolve("test-index")
+        Files.createDirectories(indexDir)
+        Files.write(indexDir.resolve("index_state.txt"), listOf("false"))
+
+        val dbManager = DBManager(indexDirectoryName = "test-index", baseDirectory = baseDir)
+        FSDirectory.open(dbManager.indexPath).use { directory ->
+            IndexWriter(directory, IndexWriterConfig(StandardAnalyzer())).use { writer ->
+                dbManager.indexFilesAndDirectories(writer, roots = listOf(root))
+                writer.commit()
+            }
+        }
+        return dbManager to Search(dbManager)
+    }
+
+    @Test
+    fun `indexed search honors search mode and result filter`(
+        @TempDir tempDir: Path,
+        @TempDir appDataDir: Path,
+    ) {
+        val root = File(tempDir.toFile(), "root").apply { mkdirs() }
+        File(root, "report.pdf").writeText("x")
+        File(root, "report.png").writeText("x")
+        File(root, "report_folder").mkdirs()
+
+        val (_, search) = indexedSearchOver(appDataDir, root)
+
+        val filesOnly = search.search("report", searchMode = SearchMode.FILES)
+        assertEquals(setOf("report.pdf", "report.png"), filesOnly.map { it.itemPath.substringAfterLast(File.separatorChar) }.toSet())
+
+        val foldersOnly = search.search("report", searchMode = SearchMode.DIRECTORIES)
+        assertEquals(listOf("report_folder"), foldersOnly.map { it.itemPath.substringAfterLast(File.separatorChar) })
+
+        val imagesOnly = search.search("report", searchMode = SearchMode.FILES, resultFilter = SearchFilter.IMAGE)
+        assertEquals(listOf("report.png"), imagesOnly.map { it.itemPath.substringAfterLast(File.separatorChar) })
+
+        search.close()
+    }
+
+    @Test
+    fun `indexed search filters by type at the Lucene query level, not by post-filtering raw hits`(
+        @TempDir tempDir: Path,
+        @TempDir appDataDir: Path,
+    ) {
+        // The wanted type is heavily outnumbered by a different type sharing the same
+        // matched term, so this only passes if `type` is a query constraint (a term-level
+        // filter) rather than something applied client-side after the hits come back -
+        // the mechanism that used to let results silently drop past the raw hit cap.
+        val root = File(tempDir.toFile(), "root").apply { mkdirs() }
+        File(root, "item.png").writeText("x")
+        repeat(50) { File(root, "item_$it.txt").writeText("x") }
+
+        val (_, search) = indexedSearchOver(appDataDir, root)
+
+        val imagesOnly = search.search("item", searchMode = SearchMode.FILES, resultFilter = SearchFilter.IMAGE)
+        assertEquals(listOf("item.png"), imagesOnly.map { it.itemPath.substringAfterLast(File.separatorChar) })
+
+        search.close()
     }
 }

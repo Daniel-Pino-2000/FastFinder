@@ -55,7 +55,7 @@ fun FastFinderApp(dbManager: DBManager) {
         val query = searchQuery
         searchQuery = ""
         coroutineScope.launch {
-            results = withContext(Dispatchers.IO) { search.search(query, directory) }
+            results = withContext(Dispatchers.IO) { search.search(query, directory, searchMode, resultFilter) }
         }
     }
 

@@ -4,12 +4,16 @@ import org.apache.lucene.index.Term
 import org.apache.lucene.search.BooleanClause
 import org.apache.lucene.search.BooleanQuery
 import org.apache.lucene.search.SearcherManager
+import org.apache.lucene.search.TermQuery
 import org.apache.lucene.search.WildcardQuery
 import org.apache.lucene.store.Directory
 import org.apache.lucene.store.FSDirectory
 import org.example.fastfinder.index.DBManager
+import org.example.fastfinder.model.SearchFilter
+import org.example.fastfinder.model.SearchMode
 import org.example.fastfinder.model.SystemItem
 import org.example.fastfinder.util.Logger
+import org.example.fastfinder.util.getFileType
 import java.io.File
 import java.io.IOException
 import java.nio.file.FileVisitResult
@@ -33,11 +37,16 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
     private var openDirectory: Directory? = null
     private var searcherManager: SearcherManager? = null
 
-    fun search(query: String, customSearchDirectory: File? = null): List<SystemItem> {
+    fun search(
+        query: String,
+        customSearchDirectory: File? = null,
+        searchMode: SearchMode = SearchMode.ALL,
+        resultFilter: SearchFilter = SearchFilter.ALL,
+    ): List<SystemItem> {
         return if (customSearchDirectory != null) {
-            searchInDirectory(query, customSearchDirectory)
+            searchInDirectory(query, customSearchDirectory, searchMode, resultFilter)
         } else {
-            searchIndex(query)
+            searchIndex(query, searchMode, resultFilter)
         }
     }
 
@@ -48,7 +57,7 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
         openDirectory = null
     }
 
-    private fun searchIndex(query: String): List<SystemItem> {
+    private fun searchIndex(query: String, searchMode: SearchMode, resultFilter: SearchFilter): List<SystemItem> {
         if (dbManager.isFirstIndexCreation || dbManager.isIndexing.value) {
             Logger.info("Index is not ready yet; skipping search.")
             return emptyList()
@@ -65,6 +74,14 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
             try {
                 val booleanQuery = BooleanQuery.Builder().apply {
                     terms.forEach { term -> add(WildcardQuery(Term("name", "*$term*")), BooleanClause.Occur.MUST) }
+                    when (searchMode) {
+                        SearchMode.FILES -> add(TermQuery(Term("isFile", "true")), BooleanClause.Occur.MUST)
+                        SearchMode.DIRECTORIES -> add(TermQuery(Term("isFile", "false")), BooleanClause.Occur.MUST)
+                        SearchMode.ALL -> {}
+                    }
+                    if (searchMode == SearchMode.FILES && resultFilter != SearchFilter.ALL) {
+                        add(TermQuery(Term("type", resultFilter.name.lowercase())), BooleanClause.Occur.MUST)
+                    }
                 }.build()
 
                 val topDocs = searcher.search(booleanQuery, MAX_RESULTS)
@@ -101,7 +118,12 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
         }
     }
 
-    private fun searchInDirectory(query: String, targetDirectory: File): List<SystemItem> {
+    private fun searchInDirectory(
+        query: String,
+        targetDirectory: File,
+        searchMode: SearchMode,
+        resultFilter: SearchFilter,
+    ): List<SystemItem> {
         require(targetDirectory.exists() && targetDirectory.isDirectory) {
             "Provided path is not a valid directory: ${targetDirectory.absolutePath}"
         }
@@ -114,7 +136,10 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
             Files.walkFileTree(targetDirectory.toPath(), object : SimpleFileVisitor<Path>() {
                 override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
                     try {
-                        if (matchesAllTerms(file.fileName.toString(), terms)) {
+                        if (searchMode != SearchMode.DIRECTORIES &&
+                            matchesAllTerms(file.fileName.toString(), terms) &&
+                            (resultFilter == SearchFilter.ALL || getFileType(file.toFile()) == resultFilter)
+                        ) {
                             matches.add(SystemItem(file.toAbsolutePath().toString(), isFile = true, itemSize = attrs.size()))
                         }
                     } catch (e: AccessDeniedException) {
@@ -125,7 +150,7 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
 
                 override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
                     val name = dir.fileName?.toString().orEmpty()
-                    if (matchesAllTerms(name, terms)) {
+                    if (searchMode != SearchMode.FILES && matchesAllTerms(name, terms)) {
                         matches.add(SystemItem(dir.toAbsolutePath().toString(), isFile = false, itemSize = null))
                     }
                     return FileVisitResult.CONTINUE

@@ -15,6 +15,7 @@ import org.apache.lucene.index.IndexWriterConfig
 import org.apache.lucene.store.FSDirectory
 import org.example.fastfinder.util.AppPaths
 import org.example.fastfinder.util.Logger
+import org.example.fastfinder.util.getFileType
 import java.io.File
 import java.io.IOException
 import java.nio.file.DirectoryIteratorException
@@ -253,6 +254,10 @@ class DBManager(indexDirectoryName: String = "database", baseDirectory: Path = A
             add(StringField("isFile", isFile.toString(), Field.Store.YES))
             add(LongPoint("size", size))
             add(TextField("sizeDisplay", size.toString(), Field.Store.YES))
+            if (isFile) {
+                // Stored=NO: only ever queried as an exact-match filter, never displayed.
+                add(StringField("type", getFileType(path.toFile()).name.lowercase(), Field.Store.NO))
+            }
         }
         indexWriter.addDocument(document)
 
