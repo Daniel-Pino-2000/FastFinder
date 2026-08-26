@@ -130,6 +130,25 @@ class DBManagerIndexingTest {
         DBManager(indexDirectoryName = "unused", baseDirectory = tempDir.resolve("appdata"))
 
     @Test
+    fun `indexedCount is updated every progressUpdateInterval items, not on every single one`(@TempDir tempDir: Path) {
+        val root = File(tempDir.toFile(), "root").apply { mkdirs() }
+        buildSampleTree(root) // 3 files + 3 directories = 6 documents
+
+        val dbManager = DBManager(indexDirectoryName = "unused", baseDirectory = tempDir.resolve("appdata"), progressUpdateInterval = 2)
+        assertEquals(0, dbManager.indexedCount.value, "Should report no progress before indexing starts")
+
+        FSDirectory.open(tempDir.resolve("lucene")).use { directory ->
+            IndexWriter(directory, IndexWriterConfig(StandardAnalyzer())).use { writer ->
+                dbManager.indexFilesAndDirectories(writer, roots = listOf(root))
+                writer.commit()
+            }
+        }
+
+        // 6 documents total, interval of 2: the counter crosses a multiple of 2 at 2, 4, and 6.
+        assertEquals(6, dbManager.indexedCount.value)
+    }
+
+    @Test
     fun `moveDirectory renames the directory in place when the target does not yet exist`(@TempDir tempDir: Path) {
         val source = Files.createDirectories(tempDir.resolve("source"))
         File(source.toFile(), "segment.bin").writeText("index bytes")

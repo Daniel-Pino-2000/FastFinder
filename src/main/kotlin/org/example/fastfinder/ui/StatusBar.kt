@@ -27,6 +27,7 @@ import org.example.fastfinder.ui.theme.AppTheme
 @Composable
 fun StatusBar(
     isIndexing: Boolean,
+    indexedCount: Int,
     onCustomSearch: () -> Unit,
     onUpdateDatabase: () -> Unit,
 ) {
@@ -40,7 +41,7 @@ fun StatusBar(
         ) {
             if (isIndexing) {
                 Text(
-                    text = "Indexing Database",
+                    text = "Indexing Database" + if (indexedCount > 0) " - %,d items indexed".format(indexedCount) else "",
                     style = MaterialTheme.typography.body2.copy(
                         fontSize = 14.sp,
                         color = MaterialTheme.colors.onSurface.copy(alpha = 0.8f)

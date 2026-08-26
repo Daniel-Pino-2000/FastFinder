@@ -38,6 +38,7 @@ fun FastFinderApp(dbManager: DBManager) {
     val coroutineScope = rememberCoroutineScope()
     val isIndexing by dbManager.isIndexing.collectAsState()
     val lastError by dbManager.lastError.collectAsState()
+    val indexedCount by dbManager.indexedCount.collectAsState()
 
     var searchQuery by remember { mutableStateOf("") }
     var searchMode by remember { mutableStateOf(SearchMode.ALL) }
@@ -86,6 +87,7 @@ fun FastFinderApp(dbManager: DBManager) {
 
             StatusBar(
                 isIndexing = isIndexing,
+                indexedCount = indexedCount,
                 onCustomSearch = {
                     val directory = showDirectoryPicker()
                     if (directory != null) {

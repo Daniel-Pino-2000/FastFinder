@@ -42,7 +42,13 @@ import kotlin.io.AccessDeniedException
  * into place once the new index has committed successfully, so [indexPath]
  * keeps serving searches from the previous index while a new one is built.
  */
-class DBManager(indexDirectoryName: String = "database", baseDirectory: Path = AppPaths.root) {
+class DBManager(
+    indexDirectoryName: String = "database",
+    baseDirectory: Path = AppPaths.root,
+    // How many indexed items pass between progress updates - throttled so the fork-join
+    // indexing threads aren't all hammering a shared StateFlow write on every single file.
+    private val progressUpdateInterval: Int = 1000,
+) {
     private val analyzer = StandardAnalyzer()
     private val totalIndexed = AtomicInteger(0)
     private val skippedPaths = Collections.synchronizedList(mutableListOf<String>())
@@ -60,6 +66,10 @@ class DBManager(indexDirectoryName: String = "database", baseDirectory: Path = A
 
     private val _lastError = MutableStateFlow<String?>(null)
     val lastError: StateFlow<String?> = _lastError.asStateFlow()
+
+    private val _indexedCount = MutableStateFlow(0)
+    /** Number of items indexed so far in the current (or most recently completed) run. */
+    val indexedCount: StateFlow<Int> = _indexedCount.asStateFlow()
 
     init {
         indexPath = baseDirectory.resolve(indexDirectoryName)
@@ -93,6 +103,7 @@ class DBManager(indexDirectoryName: String = "database", baseDirectory: Path = A
             try {
                 Logger.info("Starting indexing process...")
                 totalIndexed.set(0)
+                _indexedCount.value = 0
                 skippedPaths.clear()
                 _lastError.value = null
 
@@ -107,6 +118,7 @@ class DBManager(indexDirectoryName: String = "database", baseDirectory: Path = A
                 }
 
                 Logger.info("Indexing completed. Total items indexed: ${totalIndexed.get()}")
+                _indexedCount.value = totalIndexed.get()
                 replaceOldIndexWithNew(newIndexPath)
                 isFirstIndexCreation = false
                 writeStateFile()
@@ -262,7 +274,10 @@ class DBManager(indexDirectoryName: String = "database", baseDirectory: Path = A
         indexWriter.addDocument(document)
 
         val count = totalIndexed.incrementAndGet()
-        if (count % 1000 == 0) Logger.info("Indexed $count items...")
+        if (count % progressUpdateInterval == 0) {
+            Logger.info("Indexed $count items...")
+            _indexedCount.value = count
+        }
     }
 
     /**
