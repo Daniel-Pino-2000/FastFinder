@@ -293,14 +293,13 @@ class DBManager(indexDirectoryName: String = "database", baseDirectory: Path = A
             Logger.info("Finalizing index creation...")
             indexDirectory.close()
 
-            val oldIndexDir = indexPath.toFile()
-            if (oldIndexDir.exists() && !isFirstIndexCreation) {
-                Logger.info("Deleting old index directory: ${oldIndexDir.absolutePath}")
-                check(deleteDirectory(oldIndexDir)) { "Failed to delete the old index directory." }
+            if (Files.exists(indexPath)) {
+                Logger.info("Removing previous index directory: ${indexPath.toAbsolutePath()}")
+                check(deleteDirectory(indexPath.toFile())) { "Failed to delete the old index directory." }
             }
 
-            Logger.info("Copying new index into ${indexPath.toAbsolutePath()}")
-            copyDirectory(newIndexPath, indexPath)
+            Logger.info("Moving new index into ${indexPath.toAbsolutePath()}")
+            moveDirectory(newIndexPath, indexPath)
 
             indexDirectory = FSDirectory.open(indexPath)
             Logger.info("Index replacement completed.")
@@ -309,6 +308,23 @@ class DBManager(indexDirectoryName: String = "database", baseDirectory: Path = A
             _lastError.value = "Failed to finalize the new index: ${e.message ?: e::class.simpleName}"
         } finally {
             cleanUpTemporaryDirectory(newIndexPath)
+        }
+    }
+
+    /**
+     * Renames [source] to [target] in one filesystem operation when possible - both paths
+     * are already on the same volume in the common case (temp dir and index dir are both
+     * under [AppPaths.root]), so this avoids a full byte-for-byte copy of the index.
+     * Falls back to a file-by-file copy for the rare case where they're on different
+     * filesystems, where a directory rename isn't possible.
+     */
+    internal fun moveDirectory(source: Path, target: Path) {
+        try {
+            Files.move(source, target)
+            Logger.info("Renamed index directory in place.")
+        } catch (e: IOException) {
+            Logger.info("Directory rename unavailable (${e::class.simpleName}); copying files individually.")
+            copyDirectory(source, target)
         }
     }
 

@@ -10,6 +10,7 @@ import org.apache.lucene.search.TermQuery
 import org.apache.lucene.store.FSDirectory
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -123,5 +124,34 @@ class DBManagerIndexingTest {
             val hits = searcher.search(TermQuery(Term("path", lookalike.absolutePath)), 1)
             assertFalse(hits.totalHits == 0L, "A folder that merely contains 'Windows' in its name should still be indexed")
         }
+    }
+
+    private fun newDbManager(tempDir: Path) =
+        DBManager(indexDirectoryName = "unused", baseDirectory = tempDir.resolve("appdata"))
+
+    @Test
+    fun `moveDirectory renames the directory in place when the target does not yet exist`(@TempDir tempDir: Path) {
+        val source = Files.createDirectories(tempDir.resolve("source"))
+        File(source.toFile(), "segment.bin").writeText("index bytes")
+        val target = tempDir.resolve("target")
+
+        newDbManager(tempDir).moveDirectory(source, target)
+
+        assertEquals("index bytes", File(target.toFile(), "segment.bin").readText())
+        assertFalse(Files.exists(source), "A successful rename should leave nothing behind at the source path")
+    }
+
+    @Test
+    fun `moveDirectory falls back to copying files when the target already exists`(@TempDir tempDir: Path) {
+        val source = Files.createDirectories(tempDir.resolve("source"))
+        File(source.toFile(), "segment.bin").writeText("index bytes")
+        // Files.move refuses to rename onto an existing directory, forcing the copy fallback.
+        val target = Files.createDirectories(tempDir.resolve("target"))
+
+        newDbManager(tempDir).moveDirectory(source, target)
+
+        assertEquals("index bytes", File(target.toFile(), "segment.bin").readText())
+        assertTrue(Files.exists(source), "The copy fallback should leave the source directory untouched")
+        assertEquals("index bytes", File(source.toFile(), "segment.bin").readText())
     }
 }
