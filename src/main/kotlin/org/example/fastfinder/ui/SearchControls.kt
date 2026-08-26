@@ -19,6 +19,8 @@ import androidx.compose.material.Text
 import androidx.compose.material.TextFieldDefaults
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -31,6 +33,7 @@ import androidx.compose.ui.input.key.*
 import androidx.compose.ui.unit.dp
 import org.example.fastfinder.model.SearchFilter
 import org.example.fastfinder.model.SearchMode
+import org.example.fastfinder.model.SortBy
 import org.example.fastfinder.ui.theme.AppTheme
 
 @Composable
@@ -42,6 +45,10 @@ fun SearchControls(
     onSearchModeChange: (SearchMode) -> Unit,
     resultFilter: SearchFilter,
     onResultFilterChange: (SearchFilter) -> Unit,
+    sortBy: SortBy,
+    onSortByChange: (SortBy) -> Unit,
+    sortAscending: Boolean,
+    onToggleSortDirection: () -> Unit,
 ) {
     Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
         Spacer(modifier = Modifier.width(8.dp))
@@ -83,6 +90,22 @@ fun SearchControls(
             onSelect = onResultFilterChange,
             enabled = searchMode == SearchMode.FILES
         )
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        SortByDropdown(selected = sortBy, onSelect = onSortByChange)
+
+        Button(
+            onClick = onToggleSortDirection,
+            shape = RoundedCornerShape(5.dp),
+            colors = ButtonDefaults.buttonColors(backgroundColor = AppTheme.buttonColor, contentColor = Color.White),
+            modifier = Modifier.height(56.dp)
+        ) {
+            Icon(
+                if (sortAscending) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward,
+                contentDescription = if (sortAscending) "Sorted ascending" else "Sorted descending"
+            )
+        }
     }
 }
 
@@ -101,6 +124,13 @@ private val SearchFilter.label: String
         SearchFilter.AUDIO -> "Audios"
         SearchFilter.EXECUTABLE -> "Executables"
         SearchFilter.ALL -> "All Files"
+    }
+
+private val SortBy.label: String
+    get() = when (this) {
+        SortBy.NAME -> "Name"
+        SortBy.SIZE -> "Size"
+        SortBy.TYPE -> "Type"
     }
 
 @Composable
@@ -122,6 +152,31 @@ private fun SearchModeDropdown(selected: SearchMode, onSelect: (SearchMode) -> U
             SearchMode.entries.forEach { mode ->
                 DropdownMenuItem(onClick = { onSelect(mode); expanded = false }) {
                     Text(mode.label)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SortByDropdown(selected: SortBy, onSelect: (SortBy) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        Button(
+            onClick = { expanded = true },
+            shape = RoundedCornerShape(5.dp),
+            colors = ButtonDefaults.buttonColors(backgroundColor = AppTheme.buttonColor, contentColor = Color.White),
+            modifier = Modifier.height(56.dp).padding(end = 8.dp)
+        ) {
+            Text(text = "Sort: ${selected.label}")
+            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+        }
+
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            SortBy.entries.forEach { option ->
+                DropdownMenuItem(onClick = { onSelect(option); expanded = false }) {
+                    Text(option.label)
                 }
             }
         }

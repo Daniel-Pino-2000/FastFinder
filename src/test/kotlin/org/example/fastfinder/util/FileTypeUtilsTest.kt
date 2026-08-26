@@ -2,6 +2,7 @@ package org.example.fastfinder.util
 
 import org.example.fastfinder.model.SearchFilter
 import org.example.fastfinder.model.SearchMode
+import org.example.fastfinder.model.SortBy
 import org.example.fastfinder.model.SystemItem
 import java.io.File
 import kotlin.test.Test
@@ -70,5 +71,57 @@ class FileTypeUtilsTest {
         assertFalse(doc.isVisible(SearchMode.FILES, SearchFilter.VIDEO))
         assertTrue(doc.isVisible(SearchMode.FILES, SearchFilter.ALL))
         assertFalse(dir.isVisible(SearchMode.FILES, SearchFilter.ALL))
+    }
+
+    private fun names(items: List<SystemItem>) = items.map { it.itemPath.substringAfterLast('\\') }
+
+    @Test
+    fun `systemItemComparator always orders folders before files, regardless of sort key or direction`() {
+        val file = SystemItem("C:\\a_first_alphabetically.txt", isFile = true, itemSize = 999)
+        val dir = SystemItem("C:\\z_last_alphabetically", isFile = false, itemSize = null)
+
+        for (sortBy in SortBy.entries) {
+            for (ascending in listOf(true, false)) {
+                val sorted = listOf(file, dir).sortedWith(systemItemComparator(sortBy, ascending))
+                assertEquals(listOf("z_last_alphabetically", "a_first_alphabetically.txt"), names(sorted),
+                    "folders should sort first for sortBy=$sortBy ascending=$ascending")
+            }
+        }
+    }
+
+    @Test
+    fun `systemItemComparator sorts by name case-insensitively`() {
+        val items = listOf(
+            SystemItem("C:\\banana.txt", isFile = true, itemSize = 1),
+            SystemItem("C:\\Apple.txt", isFile = true, itemSize = 1),
+            SystemItem("C:\\cherry.txt", isFile = true, itemSize = 1),
+        )
+
+        assertEquals(listOf("Apple.txt", "banana.txt", "cherry.txt"), names(items.sortedWith(systemItemComparator(SortBy.NAME, ascending = true))))
+        assertEquals(listOf("cherry.txt", "banana.txt", "Apple.txt"), names(items.sortedWith(systemItemComparator(SortBy.NAME, ascending = false))))
+    }
+
+    @Test
+    fun `systemItemComparator sorts by size`() {
+        val items = listOf(
+            SystemItem("C:\\medium.txt", isFile = true, itemSize = 500),
+            SystemItem("C:\\small.txt", isFile = true, itemSize = 10),
+            SystemItem("C:\\large.txt", isFile = true, itemSize = 5000),
+        )
+
+        assertEquals(listOf("small.txt", "medium.txt", "large.txt"), names(items.sortedWith(systemItemComparator(SortBy.SIZE, ascending = true))))
+        assertEquals(listOf("large.txt", "medium.txt", "small.txt"), names(items.sortedWith(systemItemComparator(SortBy.SIZE, ascending = false))))
+    }
+
+    @Test
+    fun `systemItemComparator sorts by type`() {
+        val items = listOf(
+            SystemItem("C:\\video.mp4", isFile = true, itemSize = 1),
+            SystemItem("C:\\doc.pdf", isFile = true, itemSize = 1),
+            SystemItem("C:\\audio.mp3", isFile = true, itemSize = 1),
+        )
+
+        // AUDIO < DOCUMENT < VIDEO alphabetically by enum name
+        assertEquals(listOf("audio.mp3", "doc.pdf", "video.mp4"), names(items.sortedWith(systemItemComparator(SortBy.TYPE, ascending = true))))
     }
 }

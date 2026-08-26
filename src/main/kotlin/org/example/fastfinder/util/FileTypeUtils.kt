@@ -2,6 +2,7 @@ package org.example.fastfinder.util
 
 import org.example.fastfinder.model.SearchFilter
 import org.example.fastfinder.model.SearchMode
+import org.example.fastfinder.model.SortBy
 import org.example.fastfinder.model.SystemItem
 import java.io.File
 
@@ -58,4 +59,17 @@ fun SystemItem.isVisible(searchMode: SearchMode, resultFilter: SearchFilter): Bo
     SearchMode.ALL -> true
     SearchMode.DIRECTORIES -> !isFile
     SearchMode.FILES -> isFile && (resultFilter == SearchFilter.ALL || getFileType(File(itemPath)) == resultFilter)
+}
+
+private fun SystemItem.name(): String = itemPath.substringAfterLast(File.separatorChar).lowercase()
+
+/** Orders folders before files (matching Explorer/Finder convention), then by [sortBy] within each group. */
+fun systemItemComparator(sortBy: SortBy, ascending: Boolean): Comparator<SystemItem> {
+    val withinGroup: Comparator<SystemItem> = when (sortBy) {
+        SortBy.NAME -> compareBy { it.name() }
+        SortBy.SIZE -> compareBy { it.itemSize ?: 0L }
+        SortBy.TYPE -> compareBy { if (it.isFile) getFileType(File(it.itemPath)).name else "" }
+    }
+    val directed = if (ascending) withinGroup else withinGroup.reversed()
+    return compareBy<SystemItem> { it.isFile }.then(directed)
 }

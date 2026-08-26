@@ -25,6 +25,7 @@ import kotlinx.coroutines.withContext
 import org.example.fastfinder.index.DBManager
 import org.example.fastfinder.model.SearchFilter
 import org.example.fastfinder.model.SearchMode
+import org.example.fastfinder.model.SortBy
 import org.example.fastfinder.model.SystemItem
 import org.example.fastfinder.search.Search
 import org.example.fastfinder.ui.theme.AppTheme
@@ -43,6 +44,8 @@ fun FastFinderApp(dbManager: DBManager) {
     var searchQuery by remember { mutableStateOf("") }
     var searchMode by remember { mutableStateOf(SearchMode.ALL) }
     var resultFilter by remember { mutableStateOf(SearchFilter.ALL) }
+    var sortBy by remember { mutableStateOf(SortBy.NAME) }
+    var sortAscending by remember { mutableStateOf(true) }
     var results by remember { mutableStateOf(emptyList<SystemItem>()) }
 
     var showCustomSearchDialog by remember { mutableStateOf(false) }
@@ -76,12 +79,18 @@ fun FastFinderApp(dbManager: DBManager) {
                 onSearchModeChange = { searchMode = it },
                 resultFilter = resultFilter,
                 onResultFilterChange = { resultFilter = it },
+                sortBy = sortBy,
+                onSortByChange = { sortBy = it },
+                sortAscending = sortAscending,
+                onToggleSortDirection = { sortAscending = !sortAscending },
             )
 
             ResultsList(
                 items = results,
                 searchMode = searchMode,
                 resultFilter = resultFilter,
+                sortBy = sortBy,
+                sortAscending = sortAscending,
                 modifier = Modifier.weight(1f).fillMaxWidth().fillMaxHeight().padding(horizontal = 8.dp)
             )
 

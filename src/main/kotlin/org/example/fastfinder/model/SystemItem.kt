@@ -20,3 +20,9 @@ enum class SearchFilter {
     ALL,
     EXECUTABLE
 }
+
+enum class SortBy {
+    NAME,
+    SIZE,
+    TYPE
+}
