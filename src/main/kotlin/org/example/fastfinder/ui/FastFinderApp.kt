@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -20,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.example.fastfinder.index.DBManager
@@ -57,10 +59,20 @@ fun FastFinderApp(dbManager: DBManager) {
             return
         }
         val query = searchQuery
-        searchQuery = ""
         coroutineScope.launch {
             results = withContext(Dispatchers.IO) { search.search(query, directory, searchMode, resultFilter) }
         }
+    }
+
+    // Live search: re-runs (debounced) whenever the query text or an index-query filter
+    // changes. LaunchedEffect cancels and restarts its block on every key change, so a
+    // burst of keystrokes only ever runs the search for the last one - free debouncing.
+    // Deliberately doesn't check isFirstIndexCreation/show a dialog here (unlike
+    // runSearch): Search.search() already no-ops safely while the index isn't ready, and
+    // popping a modal on every keystroke would be a real bug, not just noise.
+    LaunchedEffect(searchQuery, searchMode, resultFilter) {
+        delay(250)
+        results = withContext(Dispatchers.IO) { search.search(query = searchQuery, searchMode = searchMode, resultFilter = resultFilter) }
     }
 
     MaterialTheme {
