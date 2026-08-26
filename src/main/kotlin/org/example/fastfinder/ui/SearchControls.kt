@@ -33,6 +33,7 @@ import androidx.compose.ui.input.key.*
 import androidx.compose.ui.unit.dp
 import org.example.fastfinder.model.SearchFilter
 import org.example.fastfinder.model.SearchMode
+import org.example.fastfinder.model.SizeFilter
 import org.example.fastfinder.model.SortBy
 import org.example.fastfinder.ui.theme.LocalAppColors
 
@@ -45,6 +46,8 @@ fun SearchControls(
     onSearchModeChange: (SearchMode) -> Unit,
     resultFilter: SearchFilter,
     onResultFilterChange: (SearchFilter) -> Unit,
+    sizeFilter: SizeFilter,
+    onSizeFilterChange: (SizeFilter) -> Unit,
     sortBy: SortBy,
     onSortByChange: (SortBy) -> Unit,
     sortAscending: Boolean,
@@ -91,6 +94,12 @@ fun SearchControls(
             enabled = searchMode == SearchMode.FILES
         )
 
+        SizeFilterDropdown(
+            selected = sizeFilter,
+            onSelect = onSizeFilterChange,
+            enabled = searchMode == SearchMode.FILES
+        )
+
         Spacer(modifier = Modifier.width(16.dp))
 
         SortByDropdown(selected = sortBy, onSelect = onSortByChange)
@@ -131,6 +140,16 @@ private val SortBy.label: String
         SortBy.NAME -> "Name"
         SortBy.SIZE -> "Size"
         SortBy.TYPE -> "Type"
+    }
+
+private val SizeFilter.label: String
+    get() = when (this) {
+        SizeFilter.ANY -> "Any Size"
+        SizeFilter.UNDER_10KB -> "< 10 KB"
+        SizeFilter.KB10_TO_MB1 -> "10 KB - 1 MB"
+        SizeFilter.MB1_TO_MB100 -> "1 MB - 100 MB"
+        SizeFilter.MB100_TO_GB1 -> "100 MB - 1 GB"
+        SizeFilter.OVER_1GB -> "> 1 GB"
     }
 
 @Composable
@@ -202,6 +221,32 @@ private fun ResultFilterDropdown(selected: SearchFilter, onSelect: (SearchFilter
 
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             selectableFilters.forEach { filter ->
+                DropdownMenuItem(onClick = { onSelect(filter); expanded = false }) {
+                    Text(filter.label)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SizeFilterDropdown(selected: SizeFilter, onSelect: (SizeFilter) -> Unit, enabled: Boolean) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        Button(
+            onClick = { expanded = true },
+            shape = RoundedCornerShape(5.dp),
+            colors = ButtonDefaults.buttonColors(backgroundColor = LocalAppColors.current.buttonColor, contentColor = Color.White),
+            modifier = Modifier.height(56.dp).padding(end = 8.dp),
+            enabled = enabled
+        ) {
+            Text(text = selected.label)
+            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+        }
+
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            SizeFilter.entries.forEach { filter ->
                 DropdownMenuItem(onClick = { onSelect(filter); expanded = false }) {
                     Text(filter.label)
                 }

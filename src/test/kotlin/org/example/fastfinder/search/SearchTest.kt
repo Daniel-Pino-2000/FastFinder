@@ -7,6 +7,7 @@ import org.apache.lucene.store.FSDirectory
 import org.example.fastfinder.index.DBManager
 import org.example.fastfinder.model.SearchFilter
 import org.example.fastfinder.model.SearchMode
+import org.example.fastfinder.model.SizeFilter
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
 import java.nio.file.Files
@@ -113,6 +114,26 @@ class SearchTest {
         search.close()
     }
 
+    @Test
+    fun `custom directory search honors the size filter`(
+        @TempDir tempDir: Path,
+        @TempDir appDataDir: Path,
+    ) {
+        val root = tempDir.toFile()
+        File(root, "item_small.txt").writeBytes(ByteArray(500)) // < 10 KB
+        File(root, "item_large.bin").writeBytes(ByteArray(2 * 1024 * 1024)) // 1 MB - 100 MB
+
+        val search = Search(DBManager(indexDirectoryName = "test-index", baseDirectory = appDataDir))
+
+        val smallOnly = search.search("item", customSearchDirectory = root, searchMode = SearchMode.FILES, sizeFilter = SizeFilter.UNDER_10KB)
+        assertEquals(listOf("item_small.txt"), smallOnly.map { it.itemPath.substringAfterLast(File.separatorChar) })
+
+        val largeOnly = search.search("item", customSearchDirectory = root, searchMode = SearchMode.FILES, sizeFilter = SizeFilter.MB1_TO_MB100)
+        assertEquals(listOf("item_large.bin"), largeOnly.map { it.itemPath.substringAfterLast(File.separatorChar) })
+
+        search.close()
+    }
+
     /** Builds a real Lucene index (bypassing [DBManager.createOrUpdateIndex], which always walks real drives) so [Search]'s indexed-search query logic can be exercised directly. */
     private fun indexedSearchOver(baseDir: Path, root: File): Pair<DBManager, Search> {
         val indexDir = baseDir.resolve("test-index")
@@ -170,6 +191,26 @@ class SearchTest {
 
         val imagesOnly = search.search("item", searchMode = SearchMode.FILES, resultFilter = SearchFilter.IMAGE)
         assertEquals(listOf("item.png"), imagesOnly.map { it.itemPath.substringAfterLast(File.separatorChar) })
+
+        search.close()
+    }
+
+    @Test
+    fun `indexed search honors the size filter`(
+        @TempDir tempDir: Path,
+        @TempDir appDataDir: Path,
+    ) {
+        val root = File(tempDir.toFile(), "root").apply { mkdirs() }
+        File(root, "item_small.txt").writeBytes(ByteArray(500)) // < 10 KB
+        File(root, "item_large.bin").writeBytes(ByteArray(2 * 1024 * 1024)) // 1 MB - 100 MB
+
+        val (_, search) = indexedSearchOver(appDataDir, root)
+
+        val smallOnly = search.search("item", searchMode = SearchMode.FILES, sizeFilter = SizeFilter.UNDER_10KB)
+        assertEquals(listOf("item_small.txt"), smallOnly.map { it.itemPath.substringAfterLast(File.separatorChar) })
+
+        val largeOnly = search.search("item", searchMode = SearchMode.FILES, sizeFilter = SizeFilter.MB1_TO_MB100)
+        assertEquals(listOf("item_large.bin"), largeOnly.map { it.itemPath.substringAfterLast(File.separatorChar) })
 
         search.close()
     }

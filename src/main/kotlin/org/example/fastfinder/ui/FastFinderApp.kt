@@ -30,6 +30,7 @@ import kotlinx.coroutines.withContext
 import org.example.fastfinder.index.DBManager
 import org.example.fastfinder.model.SearchFilter
 import org.example.fastfinder.model.SearchMode
+import org.example.fastfinder.model.SizeFilter
 import org.example.fastfinder.model.SortBy
 import org.example.fastfinder.model.SystemItem
 import org.example.fastfinder.search.Search
@@ -51,6 +52,7 @@ fun FastFinderApp(dbManager: DBManager) {
     var searchQuery by remember { mutableStateOf("") }
     var searchMode by remember { mutableStateOf(SearchMode.ALL) }
     var resultFilter by remember { mutableStateOf(SearchFilter.ALL) }
+    var sizeFilter by remember { mutableStateOf(SizeFilter.ANY) }
     var sortBy by remember { mutableStateOf(SortBy.NAME) }
     var sortAscending by remember { mutableStateOf(true) }
     var results by remember { mutableStateOf(emptyList<SystemItem>()) }
@@ -66,7 +68,7 @@ fun FastFinderApp(dbManager: DBManager) {
         }
         val query = searchQuery
         coroutineScope.launch {
-            results = withContext(Dispatchers.IO) { search.search(query, directory, searchMode, resultFilter) }
+            results = withContext(Dispatchers.IO) { search.search(query, directory, searchMode, resultFilter, sizeFilter) }
         }
     }
 
@@ -76,9 +78,11 @@ fun FastFinderApp(dbManager: DBManager) {
     // Deliberately doesn't check isFirstIndexCreation/show a dialog here (unlike
     // runSearch): Search.search() already no-ops safely while the index isn't ready, and
     // popping a modal on every keystroke would be a real bug, not just noise.
-    LaunchedEffect(searchQuery, searchMode, resultFilter) {
+    LaunchedEffect(searchQuery, searchMode, resultFilter, sizeFilter) {
         delay(250)
-        results = withContext(Dispatchers.IO) { search.search(query = searchQuery, searchMode = searchMode, resultFilter = resultFilter) }
+        results = withContext(Dispatchers.IO) {
+            search.search(query = searchQuery, searchMode = searchMode, resultFilter = resultFilter, sizeFilter = sizeFilter)
+        }
     }
 
     val appColors = if (isDarkTheme) DarkAppColors else LightAppColors
@@ -100,6 +104,8 @@ fun FastFinderApp(dbManager: DBManager) {
                     onSearchModeChange = { searchMode = it },
                     resultFilter = resultFilter,
                     onResultFilterChange = { resultFilter = it },
+                    sizeFilter = sizeFilter,
+                    onSizeFilterChange = { sizeFilter = it },
                     sortBy = sortBy,
                     onSortByChange = { sortBy = it },
                     sortAscending = sortAscending,
@@ -110,6 +116,7 @@ fun FastFinderApp(dbManager: DBManager) {
                     items = results,
                     searchMode = searchMode,
                     resultFilter = resultFilter,
+                    sizeFilter = sizeFilter,
                     sortBy = sortBy,
                     sortAscending = sortAscending,
                     modifier = Modifier.weight(1f).fillMaxWidth().fillMaxHeight().padding(horizontal = 8.dp)

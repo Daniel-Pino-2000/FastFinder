@@ -1,5 +1,6 @@
 package org.example.fastfinder.search
 
+import org.apache.lucene.document.LongPoint
 import org.apache.lucene.index.Term
 import org.apache.lucene.search.BooleanClause
 import org.apache.lucene.search.BooleanQuery
@@ -11,6 +12,7 @@ import org.apache.lucene.store.FSDirectory
 import org.example.fastfinder.index.DBManager
 import org.example.fastfinder.model.SearchFilter
 import org.example.fastfinder.model.SearchMode
+import org.example.fastfinder.model.SizeFilter
 import org.example.fastfinder.model.SystemItem
 import org.example.fastfinder.util.Logger
 import org.example.fastfinder.util.getFileType
@@ -42,11 +44,12 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
         customSearchDirectory: File? = null,
         searchMode: SearchMode = SearchMode.ALL,
         resultFilter: SearchFilter = SearchFilter.ALL,
+        sizeFilter: SizeFilter = SizeFilter.ANY,
     ): List<SystemItem> {
         return if (customSearchDirectory != null) {
-            searchInDirectory(query, customSearchDirectory, searchMode, resultFilter)
+            searchInDirectory(query, customSearchDirectory, searchMode, resultFilter, sizeFilter)
         } else {
-            searchIndex(query, searchMode, resultFilter)
+            searchIndex(query, searchMode, resultFilter, sizeFilter)
         }
     }
 
@@ -57,7 +60,7 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
         openDirectory = null
     }
 
-    private fun searchIndex(query: String, searchMode: SearchMode, resultFilter: SearchFilter): List<SystemItem> {
+    private fun searchIndex(query: String, searchMode: SearchMode, resultFilter: SearchFilter, sizeFilter: SizeFilter): List<SystemItem> {
         if (dbManager.isFirstIndexCreation || dbManager.isIndexing.value) {
             Logger.info("Index is not ready yet; skipping search.")
             return emptyList()
@@ -81,6 +84,9 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
                     }
                     if (searchMode == SearchMode.FILES && resultFilter != SearchFilter.ALL) {
                         add(TermQuery(Term("type", resultFilter.name.lowercase())), BooleanClause.Occur.MUST)
+                    }
+                    if (searchMode == SearchMode.FILES && sizeFilter != SizeFilter.ANY) {
+                        add(LongPoint.newRangeQuery("size", sizeFilter.minBytes, sizeFilter.maxBytes), BooleanClause.Occur.MUST)
                     }
                 }.build()
 
@@ -123,6 +129,7 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
         targetDirectory: File,
         searchMode: SearchMode,
         resultFilter: SearchFilter,
+        sizeFilter: SizeFilter,
     ): List<SystemItem> {
         require(targetDirectory.exists() && targetDirectory.isDirectory) {
             "Provided path is not a valid directory: ${targetDirectory.absolutePath}"
@@ -138,7 +145,8 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
                     try {
                         if (searchMode != SearchMode.DIRECTORIES &&
                             matchesAllTerms(file.fileName.toString(), terms) &&
-                            (resultFilter == SearchFilter.ALL || getFileType(file.toFile()) == resultFilter)
+                            (resultFilter == SearchFilter.ALL || getFileType(file.toFile()) == resultFilter) &&
+                            attrs.size() in sizeFilter.minBytes..sizeFilter.maxBytes
                         ) {
                             matches.add(SystemItem(file.toAbsolutePath().toString(), isFile = true, itemSize = attrs.size()))
                         }

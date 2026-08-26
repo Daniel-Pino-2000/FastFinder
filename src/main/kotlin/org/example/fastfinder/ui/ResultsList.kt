@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.example.fastfinder.model.SearchFilter
 import org.example.fastfinder.model.SearchMode
+import org.example.fastfinder.model.SizeFilter
 import org.example.fastfinder.model.SortBy
 import org.example.fastfinder.model.SystemItem
 import org.example.fastfinder.ui.theme.LocalAppColors
@@ -30,12 +31,13 @@ fun ResultsList(
     items: List<SystemItem>,
     searchMode: SearchMode,
     resultFilter: SearchFilter,
+    sizeFilter: SizeFilter,
     sortBy: SortBy,
     sortAscending: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val visibleItems = remember(items, searchMode, resultFilter, sortBy, sortAscending) {
-        items.filter { it.isVisible(searchMode, resultFilter) }.sortedWith(systemItemComparator(sortBy, sortAscending))
+    val visibleItems = remember(items, searchMode, resultFilter, sizeFilter, sortBy, sortAscending) {
+        items.filter { it.isVisible(searchMode, resultFilter, sizeFilter) }.sortedWith(systemItemComparator(sortBy, sortAscending))
     }
     val listState = rememberLazyListState()
 

@@ -2,6 +2,7 @@ package org.example.fastfinder.util
 
 import org.example.fastfinder.model.SearchFilter
 import org.example.fastfinder.model.SearchMode
+import org.example.fastfinder.model.SizeFilter
 import org.example.fastfinder.model.SortBy
 import org.example.fastfinder.model.SystemItem
 import java.io.File
@@ -55,10 +56,12 @@ fun formatSize(size: Long): String {
 }
 
 /** Whether this item should be shown for the given search mode / result filter combination. */
-fun SystemItem.isVisible(searchMode: SearchMode, resultFilter: SearchFilter): Boolean = when (searchMode) {
+fun SystemItem.isVisible(searchMode: SearchMode, resultFilter: SearchFilter, sizeFilter: SizeFilter = SizeFilter.ANY): Boolean = when (searchMode) {
     SearchMode.ALL -> true
     SearchMode.DIRECTORIES -> !isFile
-    SearchMode.FILES -> isFile && (resultFilter == SearchFilter.ALL || getFileType(File(itemPath)) == resultFilter)
+    SearchMode.FILES -> isFile &&
+        (resultFilter == SearchFilter.ALL || getFileType(File(itemPath)) == resultFilter) &&
+        (itemSize ?: 0L) in sizeFilter.minBytes..sizeFilter.maxBytes
 }
 
 private fun SystemItem.name(): String = itemPath.substringAfterLast(File.separatorChar).lowercase()

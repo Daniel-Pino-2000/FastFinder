@@ -2,6 +2,7 @@ package org.example.fastfinder.util
 
 import org.example.fastfinder.model.SearchFilter
 import org.example.fastfinder.model.SearchMode
+import org.example.fastfinder.model.SizeFilter
 import org.example.fastfinder.model.SortBy
 import org.example.fastfinder.model.SystemItem
 import java.io.File
@@ -71,6 +72,26 @@ class FileTypeUtilsTest {
         assertFalse(doc.isVisible(SearchMode.FILES, SearchFilter.VIDEO))
         assertTrue(doc.isVisible(SearchMode.FILES, SearchFilter.ALL))
         assertFalse(dir.isVisible(SearchMode.FILES, SearchFilter.ALL))
+    }
+
+    @Test
+    fun `isVisible in FILES mode applies the size filter`() {
+        val tiny = SystemItem("C:\\tiny.txt", isFile = true, itemSize = 500)
+        val medium = SystemItem("C:\\medium.txt", isFile = true, itemSize = 5 * 1024 * 1024)
+        val huge = SystemItem("C:\\huge.txt", isFile = true, itemSize = 2L * 1024 * 1024 * 1024)
+
+        assertTrue(tiny.isVisible(SearchMode.FILES, SearchFilter.ALL, SizeFilter.UNDER_10KB))
+        assertFalse(medium.isVisible(SearchMode.FILES, SearchFilter.ALL, SizeFilter.UNDER_10KB))
+
+        assertTrue(medium.isVisible(SearchMode.FILES, SearchFilter.ALL, SizeFilter.MB1_TO_MB100))
+        assertFalse(tiny.isVisible(SearchMode.FILES, SearchFilter.ALL, SizeFilter.MB1_TO_MB100))
+
+        assertTrue(huge.isVisible(SearchMode.FILES, SearchFilter.ALL, SizeFilter.OVER_1GB))
+        assertFalse(medium.isVisible(SearchMode.FILES, SearchFilter.ALL, SizeFilter.OVER_1GB))
+
+        // SizeFilter.ANY never excludes anything
+        assertTrue(tiny.isVisible(SearchMode.FILES, SearchFilter.ALL, SizeFilter.ANY))
+        assertTrue(huge.isVisible(SearchMode.FILES, SearchFilter.ALL, SizeFilter.ANY))
     }
 
     private fun names(items: List<SystemItem>) = items.map { it.itemPath.substringAfterLast('\\') }
