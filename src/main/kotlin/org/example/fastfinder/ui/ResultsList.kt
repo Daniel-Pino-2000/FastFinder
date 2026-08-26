@@ -21,7 +21,7 @@ import org.example.fastfinder.model.SearchFilter
 import org.example.fastfinder.model.SearchMode
 import org.example.fastfinder.model.SortBy
 import org.example.fastfinder.model.SystemItem
-import org.example.fastfinder.ui.theme.AppTheme
+import org.example.fastfinder.ui.theme.LocalAppColors
 import org.example.fastfinder.util.isVisible
 import org.example.fastfinder.util.systemItemComparator
 
@@ -39,7 +39,7 @@ fun ResultsList(
     }
     val listState = rememberLazyListState()
 
-    Box(modifier = modifier.background(color = AppTheme.lazyColumnColor, shape = RoundedCornerShape(5.dp))) {
+    Box(modifier = modifier.background(color = LocalAppColors.current.lazyColumnColor, shape = RoundedCornerShape(5.dp))) {
         LazyColumn(
             state = listState,
             contentPadding = PaddingValues(8.dp),

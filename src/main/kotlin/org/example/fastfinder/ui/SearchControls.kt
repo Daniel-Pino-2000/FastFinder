@@ -34,7 +34,7 @@ import androidx.compose.ui.unit.dp
 import org.example.fastfinder.model.SearchFilter
 import org.example.fastfinder.model.SearchMode
 import org.example.fastfinder.model.SortBy
-import org.example.fastfinder.ui.theme.AppTheme
+import org.example.fastfinder.ui.theme.LocalAppColors
 
 @Composable
 fun SearchControls(
@@ -56,7 +56,7 @@ fun SearchControls(
         OutlinedTextField(
             value = searchQuery,
             onValueChange = onSearchQueryChange,
-            colors = TextFieldDefaults.outlinedTextFieldColors(focusedBorderColor = AppTheme.buttonColor),
+            colors = TextFieldDefaults.outlinedTextFieldColors(focusedBorderColor = LocalAppColors.current.buttonColor),
             singleLine = true,
             modifier = Modifier
                 .weight(1f)
@@ -73,7 +73,7 @@ fun SearchControls(
         Box {
             Button(
                 onClick = onSearch,
-                colors = ButtonDefaults.buttonColors(backgroundColor = AppTheme.buttonColor, contentColor = Color.White),
+                colors = ButtonDefaults.buttonColors(backgroundColor = LocalAppColors.current.buttonColor, contentColor = Color.White),
                 shape = RoundedCornerShape(topStart = 0.dp, topEnd = 20.dp, bottomStart = 0.dp, bottomEnd = 20.dp),
                 modifier = Modifier.height(57.dp).offset(x = (-2).dp)
             ) {
@@ -98,7 +98,7 @@ fun SearchControls(
         Button(
             onClick = onToggleSortDirection,
             shape = RoundedCornerShape(5.dp),
-            colors = ButtonDefaults.buttonColors(backgroundColor = AppTheme.buttonColor, contentColor = Color.White),
+            colors = ButtonDefaults.buttonColors(backgroundColor = LocalAppColors.current.buttonColor, contentColor = Color.White),
             modifier = Modifier.height(56.dp)
         ) {
             Icon(
@@ -141,7 +141,7 @@ private fun SearchModeDropdown(selected: SearchMode, onSelect: (SearchMode) -> U
         Button(
             onClick = { expanded = true },
             shape = RoundedCornerShape(5.dp),
-            colors = ButtonDefaults.buttonColors(backgroundColor = AppTheme.buttonColor, contentColor = Color.White),
+            colors = ButtonDefaults.buttonColors(backgroundColor = LocalAppColors.current.buttonColor, contentColor = Color.White),
             modifier = Modifier.height(56.dp).padding(end = 8.dp)
         ) {
             Text(text = selected.label)
@@ -166,7 +166,7 @@ private fun SortByDropdown(selected: SortBy, onSelect: (SortBy) -> Unit) {
         Button(
             onClick = { expanded = true },
             shape = RoundedCornerShape(5.dp),
-            colors = ButtonDefaults.buttonColors(backgroundColor = AppTheme.buttonColor, contentColor = Color.White),
+            colors = ButtonDefaults.buttonColors(backgroundColor = LocalAppColors.current.buttonColor, contentColor = Color.White),
             modifier = Modifier.height(56.dp).padding(end = 8.dp)
         ) {
             Text(text = "Sort: ${selected.label}")
@@ -192,7 +192,7 @@ private fun ResultFilterDropdown(selected: SearchFilter, onSelect: (SearchFilter
         Button(
             onClick = { expanded = true },
             shape = RoundedCornerShape(5.dp),
-            colors = ButtonDefaults.buttonColors(backgroundColor = AppTheme.buttonColor, contentColor = Color.White),
+            colors = ButtonDefaults.buttonColors(backgroundColor = LocalAppColors.current.buttonColor, contentColor = Color.White),
             modifier = Modifier.height(56.dp).padding(end = 12.dp),
             enabled = enabled
         ) {

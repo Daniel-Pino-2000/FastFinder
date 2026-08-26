@@ -13,7 +13,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
@@ -21,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import org.example.fastfinder.model.SearchFilter
 import org.example.fastfinder.model.SystemItem
 import org.example.fastfinder.ui.theme.AppTheme
+import org.example.fastfinder.ui.theme.LocalAppColors
 import org.example.fastfinder.util.formatSize
 import org.example.fastfinder.util.getFileType
 import java.awt.Desktop
@@ -32,12 +32,13 @@ fun ResultItem(item: SystemItem) {
     var isHovered by remember { mutableStateOf(false) }
     val icon = remember(item.isFile, item.itemPath) { iconFor(item) }
     val sizeLabel = remember(item.itemSize) { item.itemSize?.let(::formatSize) }
+    val appColors = LocalAppColors.current
 
     Row(
         modifier = Modifier
             .onPointerEvent(PointerEventType.Enter) { isHovered = true }
             .onPointerEvent(PointerEventType.Exit) { isHovered = false }
-            .background(color = if (isHovered) Color.LightGray else AppTheme.lazyColumnColor)
+            .background(color = if (isHovered) appColors.hoverColor else appColors.lazyColumnColor)
             .padding(8.dp)
     ) {
         Icon(icon, contentDescription = null, modifier = Modifier.padding(8.dp))

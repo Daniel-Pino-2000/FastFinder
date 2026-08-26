@@ -9,7 +9,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.MaterialTheme
+import androidx.compose.material.darkColors
+import androidx.compose.material.lightColors
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -30,7 +33,9 @@ import org.example.fastfinder.model.SearchMode
 import org.example.fastfinder.model.SortBy
 import org.example.fastfinder.model.SystemItem
 import org.example.fastfinder.search.Search
-import org.example.fastfinder.ui.theme.AppTheme
+import org.example.fastfinder.ui.theme.DarkAppColors
+import org.example.fastfinder.ui.theme.LightAppColors
+import org.example.fastfinder.ui.theme.LocalAppColors
 import java.io.File
 
 @Composable
@@ -52,6 +57,7 @@ fun FastFinderApp(dbManager: DBManager) {
 
     var showCustomSearchDialog by remember { mutableStateOf(false) }
     var customSearchDirectory by remember { mutableStateOf<File?>(null) }
+    var isDarkTheme by remember { mutableStateOf(false) }
 
     fun runSearch(directory: File? = null) {
         if (dbManager.isFirstIndexCreation) {
@@ -75,61 +81,67 @@ fun FastFinderApp(dbManager: DBManager) {
         results = withContext(Dispatchers.IO) { search.search(query = searchQuery, searchMode = searchMode, resultFilter = resultFilter) }
     }
 
-    MaterialTheme {
-        Column(modifier = Modifier.fillMaxSize().background(color = AppTheme.backgroundColor)) {
-            lastError?.let { message ->
-                ErrorBanner(message = message, onDismiss = dbManager::clearLastError)
+    val appColors = if (isDarkTheme) DarkAppColors else LightAppColors
+
+    CompositionLocalProvider(LocalAppColors provides appColors) {
+        MaterialTheme(colors = if (isDarkTheme) darkColors(primary = appColors.buttonColor) else lightColors(primary = appColors.buttonColor)) {
+            Column(modifier = Modifier.fillMaxSize().background(color = appColors.backgroundColor)) {
+                lastError?.let { message ->
+                    ErrorBanner(message = message, onDismiss = dbManager::clearLastError)
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                SearchControls(
+                    searchQuery = searchQuery,
+                    onSearchQueryChange = { searchQuery = it },
+                    onSearch = { runSearch() },
+                    searchMode = searchMode,
+                    onSearchModeChange = { searchMode = it },
+                    resultFilter = resultFilter,
+                    onResultFilterChange = { resultFilter = it },
+                    sortBy = sortBy,
+                    onSortByChange = { sortBy = it },
+                    sortAscending = sortAscending,
+                    onToggleSortDirection = { sortAscending = !sortAscending },
+                )
+
+                ResultsList(
+                    items = results,
+                    searchMode = searchMode,
+                    resultFilter = resultFilter,
+                    sortBy = sortBy,
+                    sortAscending = sortAscending,
+                    modifier = Modifier.weight(1f).fillMaxWidth().fillMaxHeight().padding(horizontal = 8.dp)
+                )
+
+                StatusBar(
+                    isIndexing = isIndexing,
+                    indexedCount = indexedCount,
+                    isDarkTheme = isDarkTheme,
+                    onToggleTheme = { isDarkTheme = !isDarkTheme },
+                    onCustomSearch = {
+                        val directory = showDirectoryPicker()
+                        if (directory != null) {
+                            customSearchDirectory = directory
+                            showCustomSearchDialog = true
+                        }
+                    },
+                    onUpdateDatabase = { dbManager.createOrUpdateIndex(forceIndexCreation = true) }
+                )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            SearchControls(
-                searchQuery = searchQuery,
-                onSearchQueryChange = { searchQuery = it },
-                onSearch = { runSearch() },
-                searchMode = searchMode,
-                onSearchModeChange = { searchMode = it },
-                resultFilter = resultFilter,
-                onResultFilterChange = { resultFilter = it },
-                sortBy = sortBy,
-                onSortByChange = { sortBy = it },
-                sortAscending = sortAscending,
-                onToggleSortDirection = { sortAscending = !sortAscending },
-            )
-
-            ResultsList(
-                items = results,
-                searchMode = searchMode,
-                resultFilter = resultFilter,
-                sortBy = sortBy,
-                sortAscending = sortAscending,
-                modifier = Modifier.weight(1f).fillMaxWidth().fillMaxHeight().padding(horizontal = 8.dp)
-            )
-
-            StatusBar(
-                isIndexing = isIndexing,
-                indexedCount = indexedCount,
-                onCustomSearch = {
-                    val directory = showDirectoryPicker()
-                    if (directory != null) {
-                        customSearchDirectory = directory
-                        showCustomSearchDialog = true
-                    }
-                },
-                onUpdateDatabase = { dbManager.createOrUpdateIndex(forceIndexCreation = true) }
-            )
-        }
-
-        if (showCustomSearchDialog) {
-            CustomSearchDialog(
-                query = searchQuery,
-                onQueryChange = { searchQuery = it },
-                onConfirm = {
-                    showCustomSearchDialog = false
-                    customSearchDirectory?.let { runSearch(it) }
-                },
-                onDismiss = { showCustomSearchDialog = false }
-            )
+            if (showCustomSearchDialog) {
+                CustomSearchDialog(
+                    query = searchQuery,
+                    onQueryChange = { searchQuery = it },
+                    onConfirm = {
+                        showCustomSearchDialog = false
+                        customSearchDirectory?.let { runSearch(it) }
+                    },
+                    onDismiss = { showCustomSearchDialog = false }
+                )
+            }
         }
     }
 }

@@ -13,28 +13,29 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import org.example.fastfinder.ui.theme.LocalAppColors
 
 @Composable
 fun ErrorBanner(message: String, onDismiss: () -> Unit) {
+    val appColors = LocalAppColors.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFFFCE8E6))
+            .background(appColors.errorBackground)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFB3261E))
+        Icon(Icons.Default.Warning, contentDescription = null, tint = appColors.errorForeground)
         Text(
             text = message,
-            color = Color(0xFFB3261E),
+            color = appColors.errorForeground,
             modifier = Modifier.padding(horizontal = 8.dp).weight(1f)
         )
         Icon(
             Icons.Default.Close,
             contentDescription = "Dismiss",
-            tint = Color(0xFFB3261E),
+            tint = appColors.errorForeground,
             modifier = Modifier.clickable(onClick = onDismiss)
         )
     }
