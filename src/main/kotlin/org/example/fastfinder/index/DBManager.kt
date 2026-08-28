@@ -85,7 +85,7 @@ class DBManager(
         Logger.info("Index path: $indexPath")
     }
 
-    fun createOrUpdateIndex(forceIndexCreation: Boolean = false) {
+    fun createOrUpdateIndex(forceIndexCreation: Boolean = false, roots: List<File> = File.listRoots().toList()) {
         if (!_isIndexing.compareAndSet(false, true)) {
             Logger.info("Indexing already in progress. Skipping this request.")
             return
@@ -112,7 +112,7 @@ class DBManager(
 
                 FSDirectory.open(newIndexPath).use { newIndexDir ->
                     IndexWriter(newIndexDir, IndexWriterConfig(analyzer)).use { writer ->
-                        indexFilesAndDirectories(writer)
+                        indexFilesAndDirectories(writer, roots)
                         writer.commit()
                     }
                 }
@@ -309,25 +309,49 @@ class DBManager(
         return restrictedRoots.any { path.startsWith(it) }
     }
 
+    /**
+     * Swaps [newIndexPath] into [indexPath], moving the previous index aside first rather
+     * than deleting it in place - [deleteDirectory] deletes file-by-file and only reports
+     * success once every file is gone, so a single locked/undeletable file (e.g. another
+     * process briefly holding a segment file open) used to leave the old index partially
+     * deleted instead of intact. Moving it aside is a single directory operation with no
+     * partial-failure window, and is restored if anything after that fails.
+     */
     private fun replaceOldIndexWithNew(newIndexPath: Path) {
+        val backupPath = indexPath.resolveSibling("${indexPath.fileName}_old")
+        var movedOldAside = false
         try {
             Logger.info("Finalizing index creation...")
             indexDirectory.close()
 
+            if (Files.exists(backupPath)) {
+                check(deleteDirectory(backupPath.toFile())) { "Failed to clear stale backup directory $backupPath" }
+            }
+
             if (Files.exists(indexPath)) {
-                Logger.info("Removing previous index directory: ${indexPath.toAbsolutePath()}")
-                check(deleteDirectory(indexPath.toFile())) { "Failed to delete the old index directory." }
+                Logger.info("Moving previous index aside: ${indexPath.toAbsolutePath()}")
+                Files.move(indexPath, backupPath)
+                movedOldAside = true
             }
 
             Logger.info("Moving new index into ${indexPath.toAbsolutePath()}")
             moveDirectory(newIndexPath, indexPath)
-
-            indexDirectory = FSDirectory.open(indexPath)
+            runCatching { deleteDirectory(backupPath.toFile()) }
+                .onFailure { Logger.warn("Could not delete backup index directory: ${it.message}") }
             Logger.info("Index replacement completed.")
         } catch (e: Exception) {
             Logger.error("Error finalizing index creation", e)
             _lastError.value = "Failed to finalize the new index: ${e.message ?: e::class.simpleName}"
+
+            if (movedOldAside) {
+                Logger.warn("Restoring the previous index after a failed replacement.")
+                runCatching {
+                    if (Files.exists(indexPath)) deleteDirectory(indexPath.toFile())
+                    Files.move(backupPath, indexPath)
+                }.onFailure { restoreError -> Logger.error("Failed to restore the previous index", restoreError) }
+            }
         } finally {
+            indexDirectory = runCatching { FSDirectory.open(indexPath) }.getOrDefault(indexDirectory)
             cleanUpTemporaryDirectory(newIndexPath)
         }
     }

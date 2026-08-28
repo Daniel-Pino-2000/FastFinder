@@ -1,5 +1,8 @@
 package org.example.fastfinder.index
 
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.apache.lucene.analysis.standard.StandardAnalyzer
 import org.apache.lucene.index.DirectoryReader
 import org.apache.lucene.index.IndexWriter
@@ -10,11 +13,13 @@ import org.apache.lucene.search.TermQuery
 import org.apache.lucene.store.FSDirectory
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import java.io.RandomAccessFile
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -129,6 +134,11 @@ class DBManagerIndexingTest {
     private fun newDbManager(tempDir: Path) =
         DBManager(indexDirectoryName = "unused", baseDirectory = tempDir.resolve("appdata"))
 
+    /** Blocks (with a generous timeout) until a background [DBManager.createOrUpdateIndex] run finishes. */
+    private fun awaitIndexingDone(dbManager: DBManager) = runBlocking {
+        withTimeout(10_000) { dbManager.isIndexing.first { indexing -> !indexing } }
+    }
+
     @Test
     fun `indexedCount is updated every progressUpdateInterval items, not on every single one`(@TempDir tempDir: Path) {
         val root = File(tempDir.toFile(), "root").apply { mkdirs() }
@@ -172,5 +182,62 @@ class DBManagerIndexingTest {
         assertEquals("index bytes", File(target.toFile(), "segment.bin").readText())
         assertTrue(Files.exists(source), "The copy fallback should leave the source directory untouched")
         assertEquals("index bytes", File(source.toFile(), "segment.bin").readText())
+    }
+
+    @Test
+    fun `a second createOrUpdateIndex call is skipped while one is already running`(@TempDir tempDir: Path) {
+        val root = File(tempDir.toFile(), "root").apply { mkdirs() }
+        File(root, "a.txt").writeText("hi")
+        val dbManager = newDbManager(tempDir)
+
+        // compareAndSet flips isIndexing synchronously on the calling thread, before the
+        // background indexing thread even starts - so this is true immediately, regardless
+        // of how fast the (tiny) indexing run itself completes.
+        dbManager.createOrUpdateIndex(forceIndexCreation = true, roots = listOf(root))
+        assertTrue(dbManager.isIndexing.value, "The first call should flip isIndexing before returning")
+
+        // If dedupe didn't work, this second run would race the first: both reset
+        // totalIndexed/indexedCount/skippedPaths to zero and index concurrently, corrupting
+        // the final count instead of leaving it at exactly 2 (root dir + a.txt).
+        dbManager.createOrUpdateIndex(forceIndexCreation = true, roots = listOf(root))
+
+        awaitIndexingDone(dbManager)
+
+        assertEquals(2, dbManager.indexedCount.value, "A concurrent second run would have corrupted this count")
+    }
+
+    @Test
+    fun `a failed index replacement leaves the previous index queryable`(@TempDir tempDir: Path) {
+        val root = File(tempDir.toFile(), "root").apply { mkdirs() }
+        File(root, "original.txt").writeText("hi")
+        val dbManager = newDbManager(tempDir)
+
+        dbManager.createOrUpdateIndex(forceIndexCreation = true, roots = listOf(root))
+        awaitIndexingDone(dbManager)
+
+        // Lock one of the just-built index's files open so the old-index deletion inside
+        // replaceOldIndexWithNew fails (Windows refuses to delete an open file), forcing the
+        // second run down its failure path.
+        val lockedFile = Files.walk(dbManager.indexPath).use { paths ->
+            paths.filter { Files.isRegularFile(it) }.findFirst().orElseThrow()
+        }
+        val lock = RandomAccessFile(lockedFile.toFile(), "rw")
+        try {
+            File(root, "second.txt").writeText("should never make it into a committed index")
+            dbManager.createOrUpdateIndex(forceIndexCreation = true, roots = listOf(root))
+            awaitIndexingDone(dbManager)
+
+            assertNotNull(dbManager.lastError.value, "The failed replacement should surface a user-facing error")
+        } finally {
+            lock.close()
+        }
+
+        FSDirectory.open(dbManager.indexPath).use { directory ->
+            DirectoryReader.open(directory).use { reader ->
+                val searcher = IndexSearcher(reader)
+                val hits = searcher.search(TermQuery(Term("path", File(root, "original.txt").absolutePath)), 1)
+                assertTrue(hits.totalHits > 0, "Original index should survive a failed replacement")
+            }
+        }
     }
 }
