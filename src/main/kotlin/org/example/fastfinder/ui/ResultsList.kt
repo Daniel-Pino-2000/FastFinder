@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +41,14 @@ fun ResultsList(
         items.filter { it.isVisible(searchMode, resultFilter, sizeFilter) }.sortedWith(systemItemComparator(sortBy, sortAscending))
     }
     val listState = rememberLazyListState()
+
+    // The list is fully re-filtered/re-sorted whenever these inputs change, so the
+    // previous scroll position (an index into the old ordering) no longer points at
+    // anything meaningful - without this it can land the viewport in the middle of
+    // unrelated rows instead of showing the new results from the top.
+    LaunchedEffect(items, searchMode, resultFilter, sizeFilter, sortBy, sortAscending) {
+        listState.scrollToItem(0)
+    }
 
     Box(modifier = modifier.background(color = LocalAppColors.current.lazyColumnColor, shape = RoundedCornerShape(5.dp))) {
         LazyColumn(
