@@ -12,6 +12,8 @@ import java.time.format.DateTimeFormatter
  * launched from a desktop shortcut, there's no console for println to reach.
  */
 object Logger {
+    private const val MAX_LOG_SIZE_BYTES = 5L * 1024 * 1024
+
     private val timestampFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
     private val logFile: Path? = runCatching {
         val logsDir = AppPaths.root.resolve("logs")
@@ -33,6 +35,7 @@ object Logger {
         println(line)
         logFile?.let { file ->
             runCatching {
+                rotateIfTooLarge(file)
                 Files.writeString(
                     file,
                     line + System.lineSeparator(),
@@ -40,5 +43,17 @@ object Logger {
                 )
             }
         }
+    }
+
+    /**
+     * Keeps the log file from growing forever across a long-running app session: once it
+     * crosses [maxSizeBytes], the current file is kept as a single ".1" backup (overwriting
+     * whatever backup already existed) and logging continues into a fresh file.
+     */
+    internal fun rotateIfTooLarge(file: Path, maxSizeBytes: Long = MAX_LOG_SIZE_BYTES) {
+        if (!Files.exists(file) || Files.size(file) < maxSizeBytes) return
+        val backup = file.resolveSibling("${file.fileName}.1")
+        Files.deleteIfExists(backup)
+        Files.move(file, backup)
     }
 }
