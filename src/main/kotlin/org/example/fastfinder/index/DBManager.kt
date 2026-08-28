@@ -178,8 +178,12 @@ class DBManager(
      * their children's sizes directly, instead of every file walking back up through
      * all of its ancestors to update a shared size map.
      */
-    internal fun indexFilesAndDirectories(indexWriter: IndexWriter, roots: List<File> = File.listRoots().toList()) {
-        val pool = ForkJoinPool(Runtime.getRuntime().availableProcessors())
+    internal fun indexFilesAndDirectories(
+        indexWriter: IndexWriter,
+        roots: List<File> = File.listRoots().toList(),
+        parallelism: Int = Runtime.getRuntime().availableProcessors(),
+    ) {
+        val pool = ForkJoinPool(parallelism)
         try {
             val rootTasks = roots.map { root ->
                 Logger.info("Walking directory tree from: ${root.absolutePath}")

@@ -41,6 +41,13 @@ detekt {
     baseline = file("config/detekt/baseline.xml")
 }
 
+tasks.register<JavaExec>("benchmarkIndexing") {
+    group = "verification"
+    description = "One-off benchmark comparing single-threaded vs fork-join parallel indexing over a synthetic file tree."
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("org.example.fastfinder.index.IndexingBenchmarkKt")
+}
+
 
 compose.desktop {
     application {
