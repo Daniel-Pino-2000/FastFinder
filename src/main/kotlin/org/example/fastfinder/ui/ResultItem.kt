@@ -2,6 +2,9 @@ package org.example.fastfinder.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.Icon
@@ -26,7 +29,7 @@ import org.example.fastfinder.util.getFileType
 import java.awt.Desktop
 import java.io.File
 
-@OptIn(ExperimentalComposeUiApi::class)
+@OptIn(ExperimentalComposeUiApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun ResultItem(item: SystemItem) {
     var isHovered by remember { mutableStateOf(false) }
@@ -39,6 +42,12 @@ fun ResultItem(item: SystemItem) {
             .onPointerEvent(PointerEventType.Enter) { isHovered = true }
             .onPointerEvent(PointerEventType.Exit) { isHovered = false }
             .background(color = if (isHovered) appColors.hoverColor else appColors.lazyColumnColor)
+            .combinedClickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = {},
+                onDoubleClick = { openItem(item.itemPath) },
+            )
             .padding(8.dp)
     ) {
         Icon(icon, contentDescription = null, modifier = Modifier.padding(8.dp))
@@ -73,5 +82,13 @@ private fun openContainingFolder(path: String) {
     val parent = File(path).parentFile
     if (parent != null && parent.exists()) {
         Desktop.getDesktop().browse(parent.toURI())
+    }
+}
+
+/** Opens a file with its default associated app, or a directory in Explorer - same as double-clicking it there. */
+private fun openItem(path: String) {
+    val file = File(path)
+    if (file.exists()) {
+        Desktop.getDesktop().open(file)
     }
 }

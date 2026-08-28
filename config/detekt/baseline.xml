@@ -8,7 +8,7 @@
     <ID>FunctionNaming:CustomSearchDialog.kt$@Composable fun CustomSearchDialog( query: String, onQueryChange: (String) -&gt; Unit, onConfirm: () -&gt; Unit, onDismiss: () -&gt; Unit, )</ID>
     <ID>FunctionNaming:ErrorBanner.kt$@Composable fun ErrorBanner(message: String, onDismiss: () -&gt; Unit)</ID>
     <ID>FunctionNaming:FastFinderApp.kt$@Composable fun FastFinderApp(dbManager: DBManager)</ID>
-    <ID>FunctionNaming:ResultItem.kt$@OptIn(ExperimentalComposeUiApi::class) @Composable fun ResultItem(item: SystemItem)</ID>
+    <ID>FunctionNaming:ResultItem.kt$@OptIn(ExperimentalComposeUiApi::class, ExperimentalFoundationApi::class) @Composable fun ResultItem(item: SystemItem)</ID>
     <ID>FunctionNaming:ResultsList.kt$@Composable fun ResultsList( items: List&lt;SystemItem&gt;, searchMode: SearchMode, resultFilter: SearchFilter, sizeFilter: SizeFilter, sortBy: SortBy, sortAscending: Boolean, modifier: Modifier = Modifier, )</ID>
     <ID>FunctionNaming:SearchControls.kt$@Composable fun SearchControls( searchQuery: String, onSearchQueryChange: (String) -&gt; Unit, onSearch: () -&gt; Unit, searchMode: SearchMode, onSearchModeChange: (SearchMode) -&gt; Unit, resultFilter: SearchFilter, onResultFilterChange: (SearchFilter) -&gt; Unit, sizeFilter: SizeFilter, onSizeFilterChange: (SizeFilter) -&gt; Unit, sortBy: SortBy, onSortByChange: (SortBy) -&gt; Unit, sortAscending: Boolean, onToggleSortDirection: () -&gt; Unit, )</ID>
     <ID>FunctionNaming:SearchControls.kt$@Composable private fun ResultFilterDropdown(selected: SearchFilter, onSelect: (SearchFilter) -&gt; Unit, enabled: Boolean)</ID>
