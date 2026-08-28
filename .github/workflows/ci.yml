@@ -27,3 +27,6 @@ jobs:
 
       - name: Compile and run tests
         run: ./gradlew compileKotlin test --console=plain
+
+      - name: Static analysis (detekt)
+        run: ./gradlew detekt --console=plain

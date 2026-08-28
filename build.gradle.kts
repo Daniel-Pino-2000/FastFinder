@@ -4,6 +4,7 @@ plugins {
     kotlin("jvm")
     id("org.jetbrains.compose")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("io.gitlab.arturbosch.detekt") version "1.23.7"
 }
 
 group = "org.example"
@@ -33,6 +34,11 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    baseline = file("config/detekt/baseline.xml")
 }
 
 

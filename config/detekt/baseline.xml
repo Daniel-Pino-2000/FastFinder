@@ -1,0 +1,88 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues></ManuallySuppressedIssues>
+  <CurrentIssues>
+    <ID>ComplexCondition:Search.kt$Search.&lt;no name provided&gt;$searchMode != SearchMode.DIRECTORIES &amp;&amp; matchesAllTerms(file.fileName.toString(), terms) &amp;&amp; (resultFilter == SearchFilter.ALL || getFileType(file.toFile()) == resultFilter) &amp;&amp; attrs.size() in sizeFilter.minBytes..sizeFilter.maxBytes</ID>
+    <ID>CyclomaticComplexMethod:Search.kt$Search$private fun searchIndex(query: String, searchMode: SearchMode, resultFilter: SearchFilter, sizeFilter: SizeFilter): List&lt;SystemItem&gt;</ID>
+    <ID>ExplicitGarbageCollectionCall:DBManager.kt$DBManager$gc()</ID>
+    <ID>FunctionNaming:CustomSearchDialog.kt$@Composable fun CustomSearchDialog( query: String, onQueryChange: (String) -&gt; Unit, onConfirm: () -&gt; Unit, onDismiss: () -&gt; Unit, )</ID>
+    <ID>FunctionNaming:ErrorBanner.kt$@Composable fun ErrorBanner(message: String, onDismiss: () -&gt; Unit)</ID>
+    <ID>FunctionNaming:FastFinderApp.kt$@Composable fun FastFinderApp(dbManager: DBManager)</ID>
+    <ID>FunctionNaming:ResultItem.kt$@OptIn(ExperimentalComposeUiApi::class) @Composable fun ResultItem(item: SystemItem)</ID>
+    <ID>FunctionNaming:ResultsList.kt$@Composable fun ResultsList( items: List&lt;SystemItem&gt;, searchMode: SearchMode, resultFilter: SearchFilter, sizeFilter: SizeFilter, sortBy: SortBy, sortAscending: Boolean, modifier: Modifier = Modifier, )</ID>
+    <ID>FunctionNaming:SearchControls.kt$@Composable fun SearchControls( searchQuery: String, onSearchQueryChange: (String) -&gt; Unit, onSearch: () -&gt; Unit, searchMode: SearchMode, onSearchModeChange: (SearchMode) -&gt; Unit, resultFilter: SearchFilter, onResultFilterChange: (SearchFilter) -&gt; Unit, sizeFilter: SizeFilter, onSizeFilterChange: (SizeFilter) -&gt; Unit, sortBy: SortBy, onSortByChange: (SortBy) -&gt; Unit, sortAscending: Boolean, onToggleSortDirection: () -&gt; Unit, )</ID>
+    <ID>FunctionNaming:SearchControls.kt$@Composable private fun ResultFilterDropdown(selected: SearchFilter, onSelect: (SearchFilter) -&gt; Unit, enabled: Boolean)</ID>
+    <ID>FunctionNaming:SearchControls.kt$@Composable private fun SearchModeDropdown(selected: SearchMode, onSelect: (SearchMode) -&gt; Unit)</ID>
+    <ID>FunctionNaming:SearchControls.kt$@Composable private fun SizeFilterDropdown(selected: SizeFilter, onSelect: (SizeFilter) -&gt; Unit, enabled: Boolean)</ID>
+    <ID>FunctionNaming:SearchControls.kt$@Composable private fun SortByDropdown(selected: SortBy, onSelect: (SortBy) -&gt; Unit)</ID>
+    <ID>FunctionNaming:StatusBar.kt$@Composable fun StatusBar( isIndexing: Boolean, indexedCount: Int, isDarkTheme: Boolean, onToggleTheme: () -&gt; Unit, onCustomSearch: () -&gt; Unit, onUpdateDatabase: () -&gt; Unit, )</ID>
+    <ID>LongMethod:FastFinderApp.kt$@Composable fun FastFinderApp(dbManager: DBManager)</ID>
+    <ID>LongParameterList:ResultsList.kt$( items: List&lt;SystemItem&gt;, searchMode: SearchMode, resultFilter: SearchFilter, sizeFilter: SizeFilter, sortBy: SortBy, sortAscending: Boolean, modifier: Modifier = Modifier, )</ID>
+    <ID>LongParameterList:SearchControls.kt$( searchQuery: String, onSearchQueryChange: (String) -&gt; Unit, onSearch: () -&gt; Unit, searchMode: SearchMode, onSearchModeChange: (SearchMode) -&gt; Unit, resultFilter: SearchFilter, onResultFilterChange: (SearchFilter) -&gt; Unit, sizeFilter: SizeFilter, onSizeFilterChange: (SizeFilter) -&gt; Unit, sortBy: SortBy, onSortByChange: (SortBy) -&gt; Unit, sortAscending: Boolean, onToggleSortDirection: () -&gt; Unit, )</ID>
+    <ID>LongParameterList:StatusBar.kt$( isIndexing: Boolean, indexedCount: Int, isDarkTheme: Boolean, onToggleTheme: () -&gt; Unit, onCustomSearch: () -&gt; Unit, onUpdateDatabase: () -&gt; Unit, )</ID>
+    <ID>LoopWithTooManyJumpStatements:DBManager.kt$DBManager.IndexDirectoryTask$for</ID>
+    <ID>MagicNumber:AppTheme.kt$0xFF0A5EB0</ID>
+    <ID>MagicNumber:AppTheme.kt$0xFF1E1E1E</ID>
+    <ID>MagicNumber:AppTheme.kt$0xFF2B2B2B</ID>
+    <ID>MagicNumber:AppTheme.kt$0xFF3D3D3D</ID>
+    <ID>MagicNumber:AppTheme.kt$0xFF442726</ID>
+    <ID>MagicNumber:AppTheme.kt$0xFF4C8DC9</ID>
+    <ID>MagicNumber:AppTheme.kt$0xFFB3261E</ID>
+    <ID>MagicNumber:AppTheme.kt$0xFFD3D3D3</ID>
+    <ID>MagicNumber:AppTheme.kt$0xFFE5E1DA</ID>
+    <ID>MagicNumber:AppTheme.kt$0xFFF1F0E8</ID>
+    <ID>MagicNumber:AppTheme.kt$0xFFF2B8B5</ID>
+    <ID>MagicNumber:AppTheme.kt$0xFFFCE8E6</ID>
+    <ID>MagicNumber:DBManager.kt$DBManager$100</ID>
+    <ID>MagicNumber:FastFinderApp.kt$250</ID>
+    <ID>MagicNumber:FileTypeUtils.kt$1024</ID>
+    <ID>MagicNumber:Main.kt$600</ID>
+    <ID>MagicNumber:Main.kt$800</ID>
+    <ID>MagicNumber:SystemItem.kt$SizeFilter.KB10_TO_MB1$10</ID>
+    <ID>MagicNumber:SystemItem.kt$SizeFilter.KB10_TO_MB1$1024</ID>
+    <ID>MagicNumber:SystemItem.kt$SizeFilter.MB100_TO_GB1$100</ID>
+    <ID>MagicNumber:SystemItem.kt$SizeFilter.MB100_TO_GB1$1024</ID>
+    <ID>MagicNumber:SystemItem.kt$SizeFilter.MB100_TO_GB1$1024L</ID>
+    <ID>MagicNumber:SystemItem.kt$SizeFilter.MB1_TO_MB100$100</ID>
+    <ID>MagicNumber:SystemItem.kt$SizeFilter.MB1_TO_MB100$1024</ID>
+    <ID>MagicNumber:SystemItem.kt$SizeFilter.OVER_1GB$1024</ID>
+    <ID>MagicNumber:SystemItem.kt$SizeFilter.OVER_1GB$1024L</ID>
+    <ID>MagicNumber:SystemItem.kt$SizeFilter.UNDER_10KB$10</ID>
+    <ID>MagicNumber:SystemItem.kt$SizeFilter.UNDER_10KB$1024</ID>
+    <ID>MaxLineLength:DBManagerIndexingTest.kt$DBManagerIndexingTest$assertFalse(hits.totalHits == 0L, "A folder that merely contains 'Windows' in its name should still be indexed")</ID>
+    <ID>MaxLineLength:DBManagerIndexingTest.kt$DBManagerIndexingTest$val dbManager = DBManager(indexDirectoryName = "unused", baseDirectory = tempDir.resolve("appdata"), progressUpdateInterval = 2)</ID>
+    <ID>MaxLineLength:DBManagerIndexingTest.kt$DBManagerIndexingTest$val deletedFileHits = searcher.search(TermQuery(Term("path", File(recycleBin, "deleted.txt").absolutePath)), 10)</ID>
+    <ID>MaxLineLength:FastFinderApp.kt$MaterialTheme</ID>
+    <ID>MaxLineLength:FileTypeUtils.kt$fun</ID>
+    <ID>MaxLineLength:FileTypeUtilsTest.kt$FileTypeUtilsTest$assertEquals(listOf("Apple.txt", "banana.txt", "cherry.txt"), names(items.sortedWith(systemItemComparator(SortBy.NAME, ascending = true))))</ID>
+    <ID>MaxLineLength:FileTypeUtilsTest.kt$FileTypeUtilsTest$assertEquals(listOf("audio.mp3", "doc.pdf", "video.mp4"), names(items.sortedWith(systemItemComparator(SortBy.TYPE, ascending = true))))</ID>
+    <ID>MaxLineLength:FileTypeUtilsTest.kt$FileTypeUtilsTest$assertEquals(listOf("cherry.txt", "banana.txt", "Apple.txt"), names(items.sortedWith(systemItemComparator(SortBy.NAME, ascending = false))))</ID>
+    <ID>MaxLineLength:FileTypeUtilsTest.kt$FileTypeUtilsTest$assertEquals(listOf("large.txt", "medium.txt", "small.txt"), names(items.sortedWith(systemItemComparator(SortBy.SIZE, ascending = false))))</ID>
+    <ID>MaxLineLength:FileTypeUtilsTest.kt$FileTypeUtilsTest$assertEquals(listOf("small.txt", "medium.txt", "large.txt"), names(items.sortedWith(systemItemComparator(SortBy.SIZE, ascending = true))))</ID>
+    <ID>MaxLineLength:ResultsList.kt$Box</ID>
+    <ID>MaxLineLength:ResultsList.kt$items.filter { it.isVisible(searchMode, resultFilter, sizeFilter) }.sortedWith(systemItemComparator(sortBy, sortAscending))</ID>
+    <ID>MaxLineLength:Search.kt$Search$add(LongPoint.newRangeQuery("size", sizeFilter.minBytes, sizeFilter.maxBytes), BooleanClause.Occur.MUST)</ID>
+    <ID>MaxLineLength:Search.kt$Search$private</ID>
+    <ID>MaxLineLength:Search.kt$Search.&lt;no name provided&gt;$matches.add(SystemItem(file.toAbsolutePath().toString(), isFile = true, itemSize = attrs.size()))</ID>
+    <ID>MaxLineLength:SearchControls.kt$colors = ButtonDefaults.buttonColors(backgroundColor = LocalAppColors.current.buttonColor, contentColor = Color.White)</ID>
+    <ID>MaxLineLength:SearchTest.kt$SearchTest$/** Builds a real Lucene index (bypassing [DBManager.createOrUpdateIndex], which always walks real drives) so [Search]'s indexed-search query logic can be exercised directly. */</ID>
+    <ID>MaxLineLength:SearchTest.kt$SearchTest$assertEquals(setOf("report.pdf", "report.png"), filesOnly.map { it.itemPath.substringAfterLast(File.separatorChar) }.toSet())</ID>
+    <ID>MaxLineLength:SearchTest.kt$SearchTest$val largeOnly = search.search("item", customSearchDirectory = root, searchMode = SearchMode.FILES, sizeFilter = SizeFilter.MB1_TO_MB100)</ID>
+    <ID>MaxLineLength:SearchTest.kt$SearchTest$val smallOnly = search.search("item", customSearchDirectory = root, searchMode = SearchMode.FILES, sizeFilter = SizeFilter.UNDER_10KB)</ID>
+    <ID>MaxLineLength:StatusBar.kt$text = "Indexing Database" + if (indexedCount &gt; 0) " - %,d items indexed".format(indexedCount) else ""</ID>
+    <ID>MaxLineLength:SwingDialogs.kt$"The database is currently being created. Please wait until indexing is complete, or use Custom Search for a specific folder."</ID>
+    <ID>MemberNameEqualsClassName:Search.kt$Search$fun search( query: String, customSearchDirectory: File? = null, searchMode: SearchMode = SearchMode.ALL, resultFilter: SearchFilter = SearchFilter.ALL, sizeFilter: SizeFilter = SizeFilter.ANY, ): List&lt;SystemItem&gt;</ID>
+    <ID>NestedBlockDepth:DBManager.kt$DBManager$private fun copyDirectory(source: Path, target: Path)</ID>
+    <ID>NestedBlockDepth:Search.kt$Search$private fun searchIndex(query: String, searchMode: SearchMode, resultFilter: SearchFilter, sizeFilter: SizeFilter): List&lt;SystemItem&gt;</ID>
+    <ID>ReturnCount:DBManager.kt$DBManager.IndexDirectoryTask$override fun compute(): Long</ID>
+    <ID>ReturnCount:Search.kt$Search$private fun searchIndex(query: String, searchMode: SearchMode, resultFilter: SearchFilter, sizeFilter: SizeFilter): List&lt;SystemItem&gt;</ID>
+    <ID>SwallowedException:DBManager.kt$DBManager$e: IOException</ID>
+    <ID>SwallowedException:DBManager.kt$DBManager.IndexDirectoryTask$e: AccessDeniedException</ID>
+    <ID>SwallowedException:Search.kt$Search.&lt;no name provided&gt;$e: AccessDeniedException</ID>
+    <ID>TooGenericExceptionCaught:DBManager.kt$DBManager$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:Search.kt$Search$e: Exception</ID>
+    <ID>TooManyFunctions:DBManager.kt$DBManager</ID>
+    <ID>WildcardImport:AppTheme.kt$import androidx.compose.material.icons.filled.*</ID>
+    <ID>WildcardImport:SearchControls.kt$import androidx.compose.ui.input.key.*</ID>
+  </CurrentIssues>
+</SmellBaseline>
