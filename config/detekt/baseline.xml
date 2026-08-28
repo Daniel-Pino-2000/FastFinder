@@ -76,9 +76,6 @@
     <ID>NestedBlockDepth:Search.kt$Search$private fun searchIndex(query: String, searchMode: SearchMode, resultFilter: SearchFilter, sizeFilter: SizeFilter): List&lt;SystemItem&gt;</ID>
     <ID>ReturnCount:DBManager.kt$DBManager.IndexDirectoryTask$override fun compute(): Long</ID>
     <ID>ReturnCount:Search.kt$Search$private fun searchIndex(query: String, searchMode: SearchMode, resultFilter: SearchFilter, sizeFilter: SizeFilter): List&lt;SystemItem&gt;</ID>
-    <ID>SwallowedException:DBManager.kt$DBManager$e: IOException</ID>
-    <ID>SwallowedException:DBManager.kt$DBManager.IndexDirectoryTask$e: AccessDeniedException</ID>
-    <ID>SwallowedException:Search.kt$Search.&lt;no name provided&gt;$e: AccessDeniedException</ID>
     <ID>TooGenericExceptionCaught:DBManager.kt$DBManager$e: Exception</ID>
     <ID>TooGenericExceptionCaught:Search.kt$Search$e: Exception</ID>
     <ID>TooManyFunctions:DBManager.kt$DBManager</ID>

@@ -163,6 +163,7 @@ class DBManager(
     private fun indexExists(): Boolean = try {
         DirectoryReader.open(indexDirectory).use { true }
     } catch (e: IOException) {
+        Logger.info("No existing index to open: ${e.message}")
         false
     }
 
@@ -218,7 +219,7 @@ class DBManager(
             val entries = try {
                 Files.newDirectoryStream(directory).use { it.toList() }
             } catch (e: AccessDeniedException) {
-                skippedPaths.add("Directory: $directory (Access Denied)")
+                skippedPaths.add("Directory: $directory (Access Denied: ${e.message})")
                 return 0L
             } catch (e: DirectoryIteratorException) {
                 skippedPaths.add("Directory: $directory (${e.cause?.message})")
@@ -235,7 +236,7 @@ class DBManager(
                 val attrs = try {
                     Files.readAttributes(entry, BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
                 } catch (e: AccessDeniedException) {
-                    skippedPaths.add("File: $entry (Access Denied)")
+                    skippedPaths.add("File: $entry (Access Denied: ${e.message})")
                     continue
                 } catch (e: IOException) {
                     skippedPaths.add("Failed to access: $entry (${e.message})")

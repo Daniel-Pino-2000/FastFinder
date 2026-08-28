@@ -151,7 +151,7 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
                             matches.add(SystemItem(file.toAbsolutePath().toString(), isFile = true, itemSize = attrs.size()))
                         }
                     } catch (e: AccessDeniedException) {
-                        Logger.warn("Access denied to file: $file")
+                        Logger.warn("Access denied to file: $file (${e.message})")
                     }
                     return FileVisitResult.CONTINUE
                 }
