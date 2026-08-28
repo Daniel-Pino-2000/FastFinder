@@ -11,7 +11,11 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # FastFinder is a Windows-only desktop app (Explorer integration via
+    # java.awt.Desktop, Windows-specific restricted-directory detection), so CI runs on
+    # the same platform it actually ships for rather than a Linux runner that could
+    # mask Windows-specific behavior.
+    runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,7 +30,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Compile and run tests
-        run: ./gradlew compileKotlin test --console=plain
+        run: ./gradlew.bat compileKotlin test --console=plain
 
       - name: Static analysis (detekt)
-        run: ./gradlew detekt --console=plain
+        run: ./gradlew.bat detekt --console=plain
