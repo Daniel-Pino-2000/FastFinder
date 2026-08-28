@@ -38,6 +38,7 @@ import org.example.fastfinder.search.Search
 import org.example.fastfinder.ui.theme.DarkAppColors
 import org.example.fastfinder.ui.theme.LightAppColors
 import org.example.fastfinder.ui.theme.LocalAppColors
+import org.example.fastfinder.util.AppPreferencesStore
 import java.io.File
 
 @Composable
@@ -50,17 +51,36 @@ fun FastFinderApp(dbManager: DBManager) {
     val lastError by dbManager.lastError.collectAsState()
     val indexedCount by dbManager.indexedCount.collectAsState()
 
+    val initialPreferences = remember { AppPreferencesStore.load() }
     var searchQuery by remember { mutableStateOf("") }
-    var searchMode by remember { mutableStateOf(SearchMode.ALL) }
-    var resultFilter by remember { mutableStateOf(SearchFilter.ALL) }
-    var sizeFilter by remember { mutableStateOf(SizeFilter.ANY) }
-    var sortBy by remember { mutableStateOf(SortBy.NAME) }
-    var sortAscending by remember { mutableStateOf(true) }
+    var searchMode by remember { mutableStateOf(initialPreferences.searchMode) }
+    var resultFilter by remember { mutableStateOf(initialPreferences.resultFilter) }
+    var sizeFilter by remember { mutableStateOf(initialPreferences.sizeFilter) }
+    var sortBy by remember { mutableStateOf(initialPreferences.sortBy) }
+    var sortAscending by remember { mutableStateOf(initialPreferences.sortAscending) }
     var results by remember { mutableStateOf(emptyList<SystemItem>()) }
 
     var showCustomSearchDialog by remember { mutableStateOf(false) }
     var customSearchDirectory by remember { mutableStateOf<File?>(null) }
-    var isDarkTheme by remember { mutableStateOf(false) }
+    var isDarkTheme by remember { mutableStateOf(initialPreferences.darkTheme) }
+
+    // Persists theme/filter/sort choices across restarts. Reads the current file before
+    // writing so this doesn't clobber the window size Main.kt saves independently into the
+    // same preferences file.
+    LaunchedEffect(isDarkTheme, searchMode, resultFilter, sizeFilter, sortBy, sortAscending) {
+        withContext(Dispatchers.IO) {
+            AppPreferencesStore.save(
+                AppPreferencesStore.load().copy(
+                    darkTheme = isDarkTheme,
+                    searchMode = searchMode,
+                    resultFilter = resultFilter,
+                    sizeFilter = sizeFilter,
+                    sortBy = sortBy,
+                    sortAscending = sortAscending,
+                )
+            )
+        }
+    }
 
     // Tracks whichever search is currently in flight so a newer search always cancels an
     // older one - otherwise a slow custom-directory search (runSearch) can finish after a
