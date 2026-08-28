@@ -24,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -61,28 +62,36 @@ fun FastFinderApp(dbManager: DBManager) {
     var customSearchDirectory by remember { mutableStateOf<File?>(null) }
     var isDarkTheme by remember { mutableStateOf(false) }
 
+    // Tracks whichever search is currently in flight so a newer search always cancels an
+    // older one - otherwise a slow custom-directory search (runSearch) can finish after a
+    // faster debounced live search and clobber `results` with stale data, or vice versa.
+    var searchJob by remember { mutableStateOf<Job?>(null) }
+
+    fun launchSearch(query: String, directory: File? = null, debounce: Boolean) {
+        searchJob?.cancel()
+        searchJob = coroutineScope.launch {
+            if (debounce) delay(250)
+            val searchResults = withContext(Dispatchers.IO) {
+                search.search(query, directory, searchMode, resultFilter, sizeFilter)
+            }
+            results = searchResults
+        }
+    }
+
     fun runSearch(directory: File? = null) {
         if (dbManager.isFirstIndexCreation) {
             showIndexNotReadyMessage()
             return
         }
-        val query = searchQuery
-        coroutineScope.launch {
-            results = withContext(Dispatchers.IO) { search.search(query, directory, searchMode, resultFilter, sizeFilter) }
-        }
+        launchSearch(searchQuery, directory, debounce = false)
     }
 
     // Live search: re-runs (debounced) whenever the query text or an index-query filter
-    // changes. LaunchedEffect cancels and restarts its block on every key change, so a
-    // burst of keystrokes only ever runs the search for the last one - free debouncing.
-    // Deliberately doesn't check isFirstIndexCreation/show a dialog here (unlike
+    // changes. Deliberately doesn't check isFirstIndexCreation/show a dialog here (unlike
     // runSearch): Search.search() already no-ops safely while the index isn't ready, and
     // popping a modal on every keystroke would be a real bug, not just noise.
     LaunchedEffect(searchQuery, searchMode, resultFilter, sizeFilter) {
-        delay(250)
-        results = withContext(Dispatchers.IO) {
-            search.search(query = searchQuery, searchMode = searchMode, resultFilter = resultFilter, sizeFilter = sizeFilter)
-        }
+        launchSearch(searchQuery, debounce = true)
     }
 
     val appColors = if (isDarkTheme) DarkAppColors else LightAppColors
