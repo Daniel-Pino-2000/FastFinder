@@ -74,7 +74,9 @@ private fun iconFor(item: SystemItem): ImageVector {
         SearchFilter.DOCUMENT -> AppTheme.documentFileIcon
         SearchFilter.AUDIO -> AppTheme.audioFileIcon
         SearchFilter.EXECUTABLE -> AppTheme.executableFileIcon
-        SearchFilter.ALL -> AppTheme.fileIcon
+        SearchFilter.ARCHIVE -> AppTheme.archiveFileIcon
+        SearchFilter.CODE -> AppTheme.codeFileIcon
+        SearchFilter.ALL, SearchFilter.OTHER -> AppTheme.fileIcon
     }
 }
 

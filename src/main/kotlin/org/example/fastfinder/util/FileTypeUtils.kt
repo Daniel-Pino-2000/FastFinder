@@ -35,13 +35,28 @@ private val EXECUTABLE_EXTENSIONS = setOf(
     "out", "elf", "dll", "so", "class"
 )
 
+private val ARCHIVE_EXTENSIONS = setOf(
+    "zip", "rar", "7z", "tar", "gz", "bz2", "xz", "iso", "cab", "tgz", "tbz2",
+    "lz", "lzma", "z", "arj", "war", "img", "vhd", "vhdx"
+)
+
+private val CODE_EXTENSIONS = setOf(
+    "kt", "kts", "java", "py", "js", "jsx", "ts", "tsx", "html", "htm", "css",
+    "scss", "less", "json", "xml", "yaml", "yml", "c", "cc", "cpp", "cxx", "h",
+    "hpp", "cs", "go", "rs", "php", "rb", "swift", "sql", "sh", "ps1", "gradle",
+    "dart", "lua", "r", "scala", "pl", "groovy", "toml", "ini", "cfg", "conf",
+    "vue", "svelte", "sass", "makefile", "cmake", "gitignore", "editorconfig",
+)
+
 fun getFileType(file: File): SearchFilter = when (file.extension.lowercase()) {
     in VIDEO_EXTENSIONS -> SearchFilter.VIDEO
     in AUDIO_EXTENSIONS -> SearchFilter.AUDIO
     in IMAGE_EXTENSIONS -> SearchFilter.IMAGE
     in DOCUMENT_EXTENSIONS -> SearchFilter.DOCUMENT
     in EXECUTABLE_EXTENSIONS -> SearchFilter.EXECUTABLE
-    else -> SearchFilter.ALL
+    in ARCHIVE_EXTENSIONS -> SearchFilter.ARCHIVE
+    in CODE_EXTENSIONS -> SearchFilter.CODE
+    else -> SearchFilter.OTHER
 }
 
 fun formatSize(size: Long): String {

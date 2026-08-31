@@ -18,7 +18,11 @@ enum class SearchFilter {
     IMAGE,
     VIDEO,
     ALL,
-    EXECUTABLE
+    EXECUTABLE,
+    ARCHIVE,
+    CODE,
+    /** A file whose extension doesn't match any of the categories above. */
+    OTHER,
 }
 
 enum class SortBy {

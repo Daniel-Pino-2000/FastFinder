@@ -20,13 +20,16 @@ class FileTypeUtilsTest {
         assertEquals(SearchFilter.IMAGE, getFileType(File("photo.png")))
         assertEquals(SearchFilter.DOCUMENT, getFileType(File("report.pdf")))
         assertEquals(SearchFilter.EXECUTABLE, getFileType(File("setup.exe")))
+        assertEquals(SearchFilter.ARCHIVE, getFileType(File("backup.zip")))
+        assertEquals(SearchFilter.CODE, getFileType(File("Main.kt")))
     }
 
     @Test
-    fun `getFileType is case-insensitive and defaults to ALL for unknown extensions`() {
+    fun `getFileType is case-insensitive and defaults to OTHER for unknown extensions`() {
         assertEquals(SearchFilter.IMAGE, getFileType(File("photo.PNG")))
-        assertEquals(SearchFilter.ALL, getFileType(File("notes.unknownext")))
-        assertEquals(SearchFilter.ALL, getFileType(File("no_extension")))
+        assertEquals(SearchFilter.CODE, getFileType(File("Main.KT")))
+        assertEquals(SearchFilter.OTHER, getFileType(File("notes.unknownext")))
+        assertEquals(SearchFilter.OTHER, getFileType(File("no_extension")))
     }
 
     @Test

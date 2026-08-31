@@ -132,6 +132,9 @@ private val SearchFilter.label: String
         SearchFilter.VIDEO -> "Videos"
         SearchFilter.AUDIO -> "Audios"
         SearchFilter.EXECUTABLE -> "Executables"
+        SearchFilter.ARCHIVE -> "Archives"
+        SearchFilter.CODE -> "Code"
+        SearchFilter.OTHER -> "Other"
         SearchFilter.ALL -> "All Files"
     }
 
