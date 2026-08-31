@@ -15,12 +15,18 @@ import kotlinx.coroutines.withContext
 import org.example.fastfinder.index.DBManager
 import org.example.fastfinder.ui.FastFinderApp
 import org.example.fastfinder.util.AppPreferencesStore
+import org.example.fastfinder.util.Logger
 import java.awt.Dimension
 
 private const val WINDOW_SIZE_SAVE_DEBOUNCE_MS = 500L
 
 fun main(args: Array<String>) {
     if (!ensureElevated(args)) return
+
+    if (!SingleInstance.acquire()) {
+        Logger.info("Another FastFinder instance is already running; exiting.")
+        return
+    }
 
     application {
         runApp()
