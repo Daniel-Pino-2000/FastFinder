@@ -29,6 +29,11 @@ dependencies {
     implementation("org.apache.lucene:lucene-analyzers-common:7.1.0")  // for standard analyzers
     implementation("org.apache.lucene:lucene-queryparser:7.1.0")  // for query parsing
 
+    // Win32 interop for reading the NTFS USN Journal (startup catch-up for filesystem
+    // changes made while the app was closed) - the JDK has no API for this.
+    implementation("net.java.dev.jna:jna:5.14.0")
+    implementation("net.java.dev.jna:jna-platform:5.14.0")
+
     testImplementation(kotlin("test-junit5"))
 }
 

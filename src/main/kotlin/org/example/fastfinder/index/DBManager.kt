@@ -52,6 +52,8 @@ private const val WATCHER_COMMIT_INTERVAL_MS = 2000L
 /** How long [DBManager.close] waits for the watcher's background thread to stop. */
 private const val WATCHER_SHUTDOWN_TIMEOUT_MS = 2000L
 
+private const val USN_CHECKPOINTS_FILE_NAME = "usn_checkpoints.properties"
+
 /**
  * Builds and maintains the Lucene index of the local filesystem.
  *
@@ -126,6 +128,9 @@ class DBManager(
             // this is what attaches the watcher on every normal app startup, since startup
             // almost always takes this skip-the-rebuild path rather than replaceOldIndexWithNew.
             watcher.attachTo(indexPath, roots)
+            // Catches up on anything that changed on disk while the app was closed, which the
+            // watcher above can never see - it's only live from this moment forward.
+            watcher.catchUpFromJournal(roots)
             return
         }
 
@@ -395,6 +400,9 @@ class DBManager(
             // Re-attach against whichever index directory now lives at indexPath - the new
             // one on success, or the restored previous one if the replacement above failed.
             watcher.attachTo(indexPath, roots)
+            // The fresh walk above already reflects current filesystem state, so there's
+            // nothing to catch up on - just mark "now" as the checkpoint for next time.
+            resetUsnCheckpoints(indexPath.resolve(USN_CHECKPOINTS_FILE_NAME), roots)
             cleanUpTemporaryDirectory(newIndexPath)
         }
     }
@@ -486,6 +494,7 @@ class DBManager(
         @Volatile
         private var writer: IndexWriter? = null
         private var thread: Thread? = null
+        private val checkpointFile: Path get() = indexPath.resolve(USN_CHECKPOINTS_FILE_NAME)
 
         /** (Re)attaches to the live index at [indexPath] and ensures [roots] are being watched. */
         fun attachTo(indexPath: Path, roots: List<File>) {
@@ -520,6 +529,60 @@ class DBManager(
             if (thread == null) {
                 thread = kotlin.concurrent.thread(name = "fastfinder-watcher", isDaemon = true) { processLoop() }
             }
+        }
+
+        /**
+         * Applies any filesystem changes made on [roots]' volumes while the app was closed,
+         * using the NTFS USN journal (see [UsnJournalReader]) - the watcher above is only ever
+         * live from the moment it's attached, so this is the only thing that can retroactively
+         * fill that gap. Requires [attachTo] to have already opened [writer].
+         *
+         * Best-effort per volume: one with no usable checkpoint (first run, non-NTFS, not
+         * elevated, or its journal was reset since last time) is simply skipped for this run -
+         * the live watcher still covers it going forward, it just can't retroactively catch up
+         * on what was missed while closed. Test-only synthetic roots (a subdirectory rather
+         * than an actual drive root) are silently ignored rather than querying the real volume
+         * they happen to sit on.
+         */
+        fun catchUpFromJournal(roots: List<File>) {
+            val currentWriter = synchronized(writerLock) { writer } ?: return
+            val previousCheckpoints = UsnCheckpointStore.load(checkpointFile)
+            val updatedCheckpoints = previousCheckpoints.toMutableMap()
+            var appliedAnyChange = false
+
+            for (driveLetter in realDriveLettersOf(roots)) {
+                val reader = UsnJournalReader(driveLetter)
+                val previous = previousCheckpoints[driveLetter]
+                when (val outcome = reader.catchUp(previous?.journalId, previous?.usn)) {
+                    is CatchUpOutcome.Success -> {
+                        if (outcome.changes.isNotEmpty()) {
+                            val count = outcome.changes.size
+                            Logger.info("USN journal catch-up: applying $count change(s) on $driveLetter:")
+                        }
+                        outcome.changes.forEach { change ->
+                            val kind = change.kind.toWatchEventKind()
+                            runCatching { applyEvent(Paths.get(change.path), kind) }.onFailure {
+                                Logger.warn("Error applying USN catch-up change for ${change.path}: ${it.message}")
+                            }
+                        }
+                        appliedAnyChange = appliedAnyChange || outcome.changes.isNotEmpty()
+                        updatedCheckpoints[driveLetter] = UsnCheckpoint(outcome.journalId, outcome.checkpointUsn)
+                    }
+                    CatchUpOutcome.Unavailable -> {
+                        // Bootstraps a checkpoint from the current position so a future run -
+                        // once there's a previous checkpoint to compare against - can catch up.
+                        reader.currentCheckpointOrNull()?.let { (journalId, usn) ->
+                            updatedCheckpoints[driveLetter] = UsnCheckpoint(journalId, usn)
+                        }
+                    }
+                }
+            }
+
+            if (appliedAnyChange) {
+                runCatching { currentWriter.commit() }
+                    .onFailure { Logger.warn("Error committing USN journal catch-up changes: ${it.message}") }
+            }
+            UsnCheckpointStore.save(updatedCheckpoints, checkpointFile)
         }
 
         /** Stops writing to the index (e.g. while it's about to be moved aside) without stopping the watch itself. */
@@ -650,16 +713,8 @@ class DBManager(
             }
         }
 
-        private fun readAttributesOrNull(path: Path): BasicFileAttributes? = try {
-            Files.readAttributes(path, BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
-        } catch (@Suppress("SwallowedException") e: IOException) {
-            // Expected and routine, not logged: short-lived temp/lock files (build tools,
-            // browsers, installers) constantly vanish between the watcher seeing an event
-            // and looking the path up moments later. Logging every occurrence would flood
-            // the log under ordinary background disk activity for no actionable benefit -
-            // the caller already treats a null result the same as a delete event.
-            null
-        }
+        // readAttributesOrNull lives at file scope (below) so it doesn't count against this
+        // class's function count for what is genuinely a small, state-free helper.
 
         /** Recursively indexes a directory that just appeared, which may already have contents. */
         private fun indexNewDirectory(directory: Path, writer: IndexWriter): Long {
@@ -697,4 +752,41 @@ class DBManager(
             return generateSequence(path) { it.parent }.any(::isRestrictedDirectory)
         }
     }
+}
+
+/**
+ * True filesystem roots among [roots] (e.g. `C:\`), as drive letters - excludes the synthetic
+ * subdirectory "roots" the indexing tests use to scope a walk to a small tree, so those never
+ * trigger a real USN journal query against whatever actual drive they happen to sit on.
+ */
+internal fun realDriveLettersOf(roots: List<File>): List<Char> =
+    roots.filter { it.parentFile == null }
+        .mapNotNull { it.absolutePath.firstOrNull()?.uppercaseChar() }
+        .distinct()
+
+private fun ChangeKind.toWatchEventKind(): WatchEvent.Kind<Path> = when (this) {
+    ChangeKind.CREATED -> StandardWatchEventKinds.ENTRY_CREATE
+    ChangeKind.MODIFIED -> StandardWatchEventKinds.ENTRY_MODIFY
+    ChangeKind.DELETED -> StandardWatchEventKinds.ENTRY_DELETE
+}
+
+private fun readAttributesOrNull(path: Path): BasicFileAttributes? = try {
+    Files.readAttributes(path, BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
+} catch (@Suppress("SwallowedException") e: IOException) {
+    // Expected and routine, not logged: short-lived temp/lock files (build tools, browsers,
+    // installers) constantly vanish between the watcher seeing an event and looking the path
+    // up moments later. Logging every occurrence would flood the log under ordinary background
+    // disk activity for no actionable benefit - the caller already treats a null result the
+    // same as a delete event.
+    null
+}
+
+/** Marks "now" as every real root's USN checkpoint - a fresh full rebuild already reflects current state. */
+private fun resetUsnCheckpoints(checkpointFile: Path, roots: List<File>) {
+    val checkpoints = realDriveLettersOf(roots).mapNotNull { driveLetter ->
+        UsnJournalReader(driveLetter).currentCheckpointOrNull()?.let { (journalId, usn) ->
+            driveLetter to UsnCheckpoint(journalId, usn)
+        }
+    }.toMap()
+    UsnCheckpointStore.save(checkpoints, checkpointFile)
 }

@@ -1,9 +1,11 @@
 package org.example.fastfinder
 
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
@@ -17,7 +19,16 @@ import java.awt.Dimension
 
 private const val WINDOW_SIZE_SAVE_DEBOUNCE_MS = 500L
 
-fun main() = application {
+fun main(args: Array<String>) {
+    if (!ensureElevated(args)) return
+
+    application {
+        runApp()
+    }
+}
+
+@Composable
+private fun ApplicationScope.runApp() {
     val dbManager = remember { DBManager() }
     val initialPreferences = remember { AppPreferencesStore.load() }
     val windowState = rememberWindowState(
