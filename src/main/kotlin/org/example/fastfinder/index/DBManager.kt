@@ -1,5 +1,6 @@
 package org.example.fastfinder.index
 
+import com.sun.nio.file.ExtendedWatchEventModifier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -12,28 +13,44 @@ import org.apache.lucene.document.TextField
 import org.apache.lucene.index.DirectoryReader
 import org.apache.lucene.index.IndexWriter
 import org.apache.lucene.index.IndexWriterConfig
+import org.apache.lucene.index.Term
+import org.apache.lucene.search.PrefixQuery
+import org.apache.lucene.search.TermQuery
+import org.apache.lucene.store.AlreadyClosedException
 import org.apache.lucene.store.FSDirectory
 import org.example.fastfinder.util.AppPaths
 import org.example.fastfinder.util.Logger
 import org.example.fastfinder.util.getFileType
 import java.io.File
 import java.io.IOException
+import java.nio.file.ClosedWatchServiceException
 import java.nio.file.DirectoryIteratorException
+import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
+import java.nio.file.StandardWatchEventKinds
+import java.nio.file.WatchEvent
+import java.nio.file.WatchKey
 import java.nio.file.attribute.BasicFileAttributes
 import java.util.Collections
 import java.util.concurrent.ForkJoinPool
 import java.util.concurrent.RecursiveTask
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.thread
 import kotlin.io.AccessDeniedException
+
+/** How often the watcher commits batched filesystem changes to the live index. */
+private const val WATCHER_COMMIT_INTERVAL_MS = 2000L
+
+/** How long [DBManager.close] waits for the watcher's background thread to stop. */
+private const val WATCHER_SHUTDOWN_TIMEOUT_MS = 2000L
 
 /**
  * Builds and maintains the Lucene index of the local filesystem.
@@ -71,6 +88,17 @@ class DBManager(
     /** Number of items indexed so far in the current (or most recently completed) run. */
     val indexedCount: StateFlow<Int> = _indexedCount.asStateFlow()
 
+    // Lazy: a DBManager that never actually runs createOrUpdateIndex() (e.g. most of the
+    // indexing tests, which call indexFilesAndDirectories() directly) should never pay for a
+    // WatchService or background thread it will never use.
+    private val watcherLazy = lazy { IndexWatcher() }
+    private val watcher: IndexWatcher get() = watcherLazy.value
+
+    /** Releases the filesystem watcher's background thread and native watch handles, if started. */
+    fun close() {
+        if (watcherLazy.isInitialized()) watcher.close()
+    }
+
     init {
         indexPath = baseDirectory.resolve(indexDirectoryName)
         stateFilePath = indexPath.resolve("index_state.txt")
@@ -94,6 +122,10 @@ class DBManager(
         if (!forceIndexCreation && !isFirstIndexCreation && indexExists()) {
             Logger.info("Index already exists. Skipping indexing.")
             _isIndexing.value = false
+            // A full rebuild is being skipped, but live updates still need to be watched -
+            // this is what attaches the watcher on every normal app startup, since startup
+            // almost always takes this skip-the-rebuild path rather than replaceOldIndexWithNew.
+            watcher.attachTo(indexPath, roots)
             return
         }
 
@@ -119,7 +151,7 @@ class DBManager(
 
                 Logger.info("Indexing completed. Total items indexed: ${totalIndexed.get()}")
                 _indexedCount.value = totalIndexed.get()
-                replaceOldIndexWithNew(newIndexPath)
+                replaceOldIndexWithNew(newIndexPath, roots)
                 isFirstIndexCreation = false
                 writeStateFile()
             } catch (e: Exception) {
@@ -321,11 +353,15 @@ class DBManager(
      * deleted instead of intact. Moving it aside is a single directory operation with no
      * partial-failure window, and is restored if anything after that fails.
      */
-    private fun replaceOldIndexWithNew(newIndexPath: Path) {
+    private fun replaceOldIndexWithNew(newIndexPath: Path, roots: List<File>) {
         val backupPath = indexPath.resolveSibling("${indexPath.fileName}_old")
         var movedOldAside = false
         try {
             Logger.info("Finalizing index creation...")
+            // The watcher's IndexWriter holds open file handles inside indexPath - detach it
+            // before moving that directory aside, and any changes it queued are moot anyway
+            // since the fresh index below already reflects current filesystem state.
+            watcher.detach()
             indexDirectory.close()
 
             if (Files.exists(backupPath)) {
@@ -356,6 +392,9 @@ class DBManager(
             }
         } finally {
             indexDirectory = runCatching { FSDirectory.open(indexPath) }.getOrDefault(indexDirectory)
+            // Re-attach against whichever index directory now lives at indexPath - the new
+            // one on success, or the restored previous one if the replacement above failed.
+            watcher.attachTo(indexPath, roots)
             cleanUpTemporaryDirectory(newIndexPath)
         }
     }
@@ -415,4 +454,247 @@ class DBManager(
 
     private fun deleteDirectory(directory: File): Boolean =
         directory.walkBottomUp().map { it.delete() }.toList().all { it }
+
+    /**
+     * Keeps the live index in sync with the filesystem between full rebuilds, so a file
+     * created/edited/deleted outside FastFinder shows up in search without waiting for the
+     * next "Update Database".
+     *
+     * Uses a single [java.nio.file.WatchService] per registered root with Windows'
+     * [ExtendedWatchEventModifier.FILE_TREE] modifier, which asks the OS to watch an entire
+     * subtree through one native handle (`ReadDirectoryChangesW` with `bWatchSubtree=TRUE`)
+     * instead of registering a handle per directory - indexing a whole drive can mean
+     * hundreds of thousands of directories, and one handle each would be both slow to set up
+     * and a large, unnecessary resource footprint.
+     *
+     * Changes are batched: events are applied to an in-memory [IndexWriter] as they arrive,
+     * but committed at most once per [WATCHER_COMMIT_INTERVAL_MS], since a Lucene commit is
+     * comparatively expensive and a burst of filesystem activity (e.g. extracting an archive)
+     * would otherwise trigger one per file.
+     *
+     * Deliberately out of scope: an ancestor directory's aggregated subtree size (see
+     * [indexFilesAndDirectories]) is not incrementally recomputed here - it stays stale until
+     * the next full rebuild, the same documented trade-off already made for directory sizes
+     * in general.
+     */
+    private inner class IndexWatcher : AutoCloseable {
+        private val watchService = FileSystems.getDefault().newWatchService()
+        private val registeredRoots = mutableMapOf<Path, WatchKey>()
+        private val writerLock = Any()
+        private val running = AtomicBoolean(true)
+
+        @Volatile
+        private var writer: IndexWriter? = null
+        private var thread: Thread? = null
+
+        /** (Re)attaches to the live index at [indexPath] and ensures [roots] are being watched. */
+        fun attachTo(indexPath: Path, roots: List<File>) {
+            synchronized(writerLock) {
+                writer = try {
+                    IndexWriter(FSDirectory.open(indexPath), IndexWriterConfig(analyzer))
+                } catch (e: IOException) {
+                    Logger.error("Could not attach the filesystem watcher to the index", e)
+                    null
+                }
+            }
+
+            roots.forEach { root ->
+                val path = root.toPath()
+                if (path in registeredRoots) return@forEach
+                try {
+                    val key = path.register(
+                        watchService,
+                        arrayOf(
+                            StandardWatchEventKinds.ENTRY_CREATE,
+                            StandardWatchEventKinds.ENTRY_DELETE,
+                            StandardWatchEventKinds.ENTRY_MODIFY,
+                        ),
+                        ExtendedWatchEventModifier.FILE_TREE,
+                    )
+                    registeredRoots[path] = key
+                } catch (e: IOException) {
+                    Logger.warn("Could not watch $path for live updates: ${e.message}")
+                }
+            }
+
+            if (thread == null) {
+                thread = kotlin.concurrent.thread(name = "fastfinder-watcher", isDaemon = true) { processLoop() }
+            }
+        }
+
+        /** Stops writing to the index (e.g. while it's about to be moved aside) without stopping the watch itself. */
+        fun detach() {
+            synchronized(writerLock) {
+                writer?.let { w ->
+                    runCatching { w.close() }
+                        .onFailure { Logger.warn("Error closing watcher's index writer: ${it.message}") }
+                }
+                writer = null
+            }
+        }
+
+        override fun close() {
+            running.set(false)
+            runCatching { watchService.close() }
+            detach()
+            registeredRoots.values.forEach { it.cancel() }
+            registeredRoots.clear()
+            thread?.let { t ->
+                t.interrupt()
+                t.join(WATCHER_SHUTDOWN_TIMEOUT_MS)
+                if (t.isAlive) Logger.warn("Filesystem watcher thread did not stop within the shutdown timeout.")
+            }
+            thread = null
+        }
+
+        private fun processLoop() {
+            // Local rather than a member function: it's only ever called from here, and
+            // keeping it local avoids IndexWatcher's function count tipping over detekt's
+            // per-class threshold for what is genuinely a one-line, single-use helper.
+            fun commit() {
+                try {
+                    synchronized(writerLock) { writer }?.commit()
+                } catch (e: IOException) {
+                    Logger.warn("Error committing filesystem watcher changes: ${e.message}")
+                }
+            }
+
+            var dirty = false
+            var lastCommit = System.currentTimeMillis()
+            while (running.get()) {
+                // Either exception below is a signal to stop, not to retry - close()/interrupt
+                // are the only things that ever cause one.
+                val key = try {
+                    watchService.poll(WATCHER_COMMIT_INTERVAL_MS, TimeUnit.MILLISECONDS)
+                } catch (e: InterruptedException) {
+                    Logger.info("Filesystem watcher thread interrupted; stopping: ${e.message}")
+                    running.set(false)
+                    null
+                } catch (e: ClosedWatchServiceException) {
+                    Logger.info("Filesystem watcher service closed; stopping: ${e.message}")
+                    running.set(false)
+                    null
+                }
+                if (key != null) dirty = applyPendingEvents(key) || dirty
+
+                val now = System.currentTimeMillis()
+                if (dirty && now - lastCommit >= WATCHER_COMMIT_INTERVAL_MS) {
+                    commit()
+                    dirty = false
+                    lastCommit = now
+                }
+            }
+            if (dirty) commit()
+        }
+
+        private fun applyPendingEvents(key: WatchKey): Boolean {
+            var sawEvent = false
+            for (event in key.pollEvents()) {
+                if (applyEventSafely(key, event)) sawEvent = true
+            }
+            if (!key.reset()) registeredRoots.values.remove(key)
+            return sawEvent
+        }
+
+        private fun applyEventSafely(key: WatchKey, event: WatchEvent<*>): Boolean {
+            if (event.kind() == StandardWatchEventKinds.OVERFLOW) {
+                Logger.warn("Filesystem watcher overflowed; some changes may be missed until the next full rebuild.")
+                return false
+            }
+
+            // Registration only ever happens against a Path (attachTo above), so the cast is safe.
+            val watchedRoot = key.watchable() as Path
+            @Suppress("UNCHECKED_CAST")
+            val relativePath = (event as WatchEvent<Path>).context()
+
+            return try {
+                applyEvent(watchedRoot.resolve(relativePath), event.kind())
+                true
+            } catch (e: IOException) {
+                Logger.warn("Error applying a filesystem watcher event: ${e.message}")
+                false
+            } catch (e: AlreadyClosedException) {
+                Logger.warn("Filesystem watcher event skipped: index writer was closed (${e.message})")
+                false
+            }
+        }
+
+        private fun applyEvent(path: Path, kind: WatchEvent.Kind<*>) {
+            val currentWriter = if (isExcludedFromWatching(path)) null else synchronized(writerLock) { writer }
+            if (currentWriter == null) return
+
+            // Vanished/inaccessible by the time we look, or an outright delete event: treat
+            // both the same way so the index doesn't go stale either way.
+            val attrs = if (kind == StandardWatchEventKinds.ENTRY_DELETE) null else readAttributesOrNull(path)
+            if (attrs == null) {
+                val pathString = path.toString()
+                currentWriter.deleteDocuments(
+                    TermQuery(Term("path", pathString)),
+                    PrefixQuery(Term("path", pathString + File.separator)),
+                )
+                return
+            }
+
+            if (attrs.isDirectory) {
+                // A directory's own MODIFY events (e.g. a child was renamed) carry nothing
+                // this schema tracks - only a genuinely new directory needs handling, since
+                // it may already contain files (a paste/move-in), none of which have events
+                // of their own to indicate their pre-existing content.
+                if (kind == StandardWatchEventKinds.ENTRY_CREATE) {
+                    currentWriter.deleteDocuments(Term("path", path.toString()))
+                    indexNewDirectory(path, currentWriter)
+                }
+            } else {
+                currentWriter.deleteDocuments(Term("path", path.toString()))
+                addToIndex(path, currentWriter, isFile = true, size = attrs.size())
+            }
+        }
+
+        private fun readAttributesOrNull(path: Path): BasicFileAttributes? = try {
+            Files.readAttributes(path, BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
+        } catch (@Suppress("SwallowedException") e: IOException) {
+            // Expected and routine, not logged: short-lived temp/lock files (build tools,
+            // browsers, installers) constantly vanish between the watcher seeing an event
+            // and looking the path up moments later. Logging every occurrence would flood
+            // the log under ordinary background disk activity for no actionable benefit -
+            // the caller already treats a null result the same as a delete event.
+            null
+        }
+
+        /** Recursively indexes a directory that just appeared, which may already have contents. */
+        private fun indexNewDirectory(directory: Path, writer: IndexWriter): Long {
+            if (isRestrictedDirectory(directory)) return 0L
+
+            val entries = try {
+                Files.newDirectoryStream(directory).use { it.toList() }
+            } catch (e: IOException) {
+                Logger.warn("Could not list newly created directory $directory: ${e.message}")
+                emptyList()
+            }
+
+            val subtreeSize = entries.sumOf { entry ->
+                val attrs = readAttributesOrNull(entry)
+                when {
+                    attrs == null -> 0L
+                    attrs.isDirectory -> indexNewDirectory(entry, writer)
+                    else -> attrs.size().also { addToIndex(entry, writer, isFile = true, size = it) }
+                }
+            }
+            addToIndex(directory, writer, isFile = false, size = subtreeSize)
+            return subtreeSize
+        }
+
+        /**
+         * [isRestrictedDirectory] only recognizes a restricted directory by its own exact
+         * name/prefix, which is enough for the indexing walk above since it never descends
+         * into one in the first place. FILE_TREE watching has no such luxury - it reports
+         * events arbitrarily deep inside a restricted directory - so this also walks
+         * ancestors, and additionally excludes FastFinder's own data directory to avoid
+         * indexing (and endlessly re-triggering on) its own index/log/preferences files.
+         */
+        private fun isExcludedFromWatching(path: Path): Boolean {
+            if (path.startsWith(AppPaths.root)) return true
+            return generateSequence(path) { it.parent }.any(::isRestrictedDirectory)
+        }
+    }
 }

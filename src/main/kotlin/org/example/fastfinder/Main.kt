@@ -1,5 +1,6 @@
 package org.example.fastfinder
 
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.dp
@@ -26,6 +27,10 @@ fun main() = application {
 
     LaunchedEffect(dbManager) {
         dbManager.createOrUpdateIndex(forceIndexCreation = false)
+    }
+
+    DisposableEffect(dbManager) {
+        onDispose { dbManager.close() }
     }
 
     // Persists window size across restarts, debounced so a drag-resize doesn't write on

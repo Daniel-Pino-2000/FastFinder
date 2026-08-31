@@ -202,6 +202,7 @@ class DBManagerIndexingTest {
         dbManager.createOrUpdateIndex(forceIndexCreation = true, roots = listOf(root))
 
         awaitIndexingDone(dbManager)
+        dbManager.close()
 
         assertEquals(2, dbManager.indexedCount.value, "A concurrent second run would have corrupted this count")
     }
@@ -239,5 +240,7 @@ class DBManagerIndexingTest {
                 assertTrue(hits.totalHits > 0, "Original index should survive a failed replacement")
             }
         }
+
+        dbManager.close()
     }
 }
