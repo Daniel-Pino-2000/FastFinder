@@ -53,10 +53,25 @@ private fun isRunningElevated(): Boolean = try {
  * launched, or throws if the user declines UAC) rather than firing-and-forgetting - otherwise a
  * declined prompt would silently leave no FastFinder window open at all, and the user would see
  * nothing happen when they double-click the app.
+ *
+ * Only attempted when [command] is the packaged native launcher, not a bare `java`/`javaw` - an
+ * IDE run configuration or `gradlew run` launches java.exe with a classpath that's sometimes a
+ * temporary argfile/jar IntelliJ deletes once this (the original) process exits. Relaunching
+ * that faithfully isn't reliable: `Start-Process` only confirms the child *started*, not that it
+ * stayed running, so a relaunch that spawns and then immediately dies from a missing classpath
+ * would still be reported as "succeeded" here - and by then this process has already exited too,
+ * leaving no window open at all. The packaged launcher has no such fragility: it's a real,
+ * self-contained executable, not java.exe plus a pile of easily-invalidated arguments.
  */
 private fun relaunchElevated(): Boolean {
     val info = ProcessHandle.current().info()
-    val command = info.command().orElse(null) ?: return false
+    val command = info.command().orElse(null)
+    if (command == null || isJavaLauncherExecutable(command)) {
+        Logger.info(
+            "No relaunchable command, or running via java(w).exe (IDE/gradle run) - skipping elevated relaunch."
+        )
+        return false
+    }
     val relaunchArgs = info.arguments().orElse(emptyArray()).toList() + ELEVATED_RELAUNCH_FLAG
 
     return try {
@@ -72,3 +87,6 @@ private fun relaunchElevated(): Boolean {
         false
     }
 }
+
+internal fun isJavaLauncherExecutable(command: String): Boolean =
+    command.substringAfterLast('\\').lowercase() in setOf("java.exe", "javaw.exe")
