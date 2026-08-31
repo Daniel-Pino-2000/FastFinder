@@ -2,10 +2,12 @@ package org.example.fastfinder
 
 import org.example.fastfinder.util.Logger
 import java.io.IOException
+import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
 
 private const val ELEVATED_RELAUNCH_FLAG = "--elevated-relaunch"
 private const val RELAUNCH_TIMEOUT_SECONDS = 60L
+private const val MAIN_CLASS = "org.example.fastfinder.MainKt"
 
 /**
  * FastFinder always runs elevated so it can use the NTFS USN journal to catch up on filesystem
@@ -46,36 +48,27 @@ private fun isRunningElevated(): Boolean = try {
 }
 
 /**
- * Relaunches this same process (same executable, same arguments, plus [ELEVATED_RELAUNCH_FLAG])
- * via PowerShell's `Start-Process -Verb RunAs`, which triggers the UAC consent prompt.
+ * Relaunches this same app via PowerShell's `Start-Process -Verb RunAs`, which triggers the UAC
+ * consent prompt.
  *
  * Waits for that PowerShell invocation to finish (it returns as soon as the elevated process is
  * launched, or throws if the user declines UAC) rather than firing-and-forgetting - otherwise a
  * declined prompt would silently leave no FastFinder window open at all, and the user would see
  * nothing happen when they double-click the app.
  *
- * Only attempted when [command] is the packaged native launcher, not a bare `java`/`javaw` - an
- * IDE run configuration or `gradlew run` launches java.exe with a classpath that's sometimes a
- * temporary argfile/jar IntelliJ deletes once this (the original) process exits. Relaunching
- * that faithfully isn't reliable: `Start-Process` only confirms the child *started*, not that it
- * stayed running, so a relaunch that spawns and then immediately dies from a missing classpath
- * would still be reported as "succeeded" here - and by then this process has already exited too,
- * leaving no window open at all. The packaged launcher has no such fragility: it's a real,
- * self-contained executable, not java.exe plus a pile of easily-invalidated arguments.
+ * The command to relaunch depends on how this process itself was launched (see
+ * [buildRelaunchCommand]): the packaged native launcher's own argv is replayed as-is, since it's
+ * a stable, self-contained executable, but an IDE run configuration or `gradlew run` launches
+ * java.exe/javaw.exe with a classpath that's sometimes a temporary argfile/jar the IDE deletes
+ * once this (the original) process exits - replaying that faithfully isn't reliable, so that
+ * case is instead rebuilt from this running JVM's own already-resolved `java.class.path`, which
+ * is never a reference to a temp file.
  */
 private fun relaunchElevated(): Boolean {
-    val info = ProcessHandle.current().info()
-    val command = info.command().orElse(null)
-    if (command == null || isJavaLauncherExecutable(command)) {
-        Logger.info(
-            "No relaunchable command, or running via java(w).exe (IDE/gradle run) - skipping elevated relaunch."
-        )
-        return false
-    }
-    val relaunchArgs = info.arguments().orElse(emptyArray()).toList() + ELEVATED_RELAUNCH_FLAG
+    val (executable, relaunchArgs) = buildRelaunchCommand() ?: return false
 
     return try {
-        val quotedCommand = command.replace("'", "''")
+        val quotedCommand = executable.replace("'", "''")
         val quotedArgs = relaunchArgs.joinToString(",") { "'${it.replace("'", "''")}'" }
         val psCommand = "Start-Process -FilePath '$quotedCommand' -ArgumentList $quotedArgs -Verb RunAs"
         val process = ProcessBuilder("powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", psCommand)
@@ -90,3 +83,28 @@ private fun relaunchElevated(): Boolean {
 
 internal fun isJavaLauncherExecutable(command: String): Boolean =
     command.substringAfterLast('\\').lowercase() in setOf("java.exe", "javaw.exe")
+
+/** The executable and arguments to relaunch with, or null if this process isn't relaunchable at all. */
+internal fun buildRelaunchCommand(): Pair<String, List<String>>? {
+    val info = ProcessHandle.current().info()
+    val command = info.command().orElse(null)
+
+    return if (command != null && !isJavaLauncherExecutable(command)) {
+        // The packaged native launcher: a stable, self-contained executable, safe to replay as-is.
+        val originalArgs = info.arguments().orElse(emptyArray()).toList()
+        command to (originalArgs + ELEVATED_RELAUNCH_FLAG)
+    } else {
+        // An IDE run configuration or `gradlew run` (or a command we couldn't determine at all):
+        // rebuild from this JVM's own already-resolved classpath instead of replaying the
+        // original argv, which might point at a temporary argfile/jar the IDE deletes once this
+        // process exits.
+        val javaHome = System.getProperty("java.home")
+        val classpath = System.getProperty("java.class.path")
+        if (javaHome == null || classpath == null) {
+            null
+        } else {
+            val javaExecutable = Paths.get(javaHome, "bin", "javaw.exe").toString()
+            javaExecutable to listOf("-cp", classpath, MAIN_CLASS, ELEVATED_RELAUNCH_FLAG)
+        }
+    }
+}

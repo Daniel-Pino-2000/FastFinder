@@ -1,5 +1,6 @@
 package org.example.fastfinder
 
+import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -24,5 +25,17 @@ class ElevationTest {
     @Test
     fun `the packaged native launcher is not mistaken for a java launcher`() {
         assertFalse(isJavaLauncherExecutable("""C:\Program Files\FastFinder\FastFinder.exe"""))
+    }
+
+    // A JUnit test itself always runs as a java(w).exe process, so this genuinely exercises the
+    // fallback path (rebuilding from java.class.path) rather than mocking ProcessHandle.
+    @Test
+    fun `buildRelaunchCommand falls back to a real, executable javaw when run via java`() {
+        val (executable, args) = buildRelaunchCommand() ?: error("Expected a relaunch command under a JUnit-run JVM")
+
+        assertTrue(File(executable).exists(), "$executable should be a real file")
+        assertTrue(isJavaLauncherExecutable(executable))
+        assertTrue("-cp" in args, "Expected the classpath flag in $args")
+        assertTrue(args.last() == "--elevated-relaunch")
     }
 }
