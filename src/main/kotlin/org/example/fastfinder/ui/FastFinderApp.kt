@@ -51,6 +51,14 @@ fun FastFinderApp(dbManager: DBManager) {
     val lastError by dbManager.lastError.collectAsState()
     val indexedCount by dbManager.indexedCount.collectAsState()
 
+    // Releases the directory/reader Search keeps open across queries before a rebuild starts -
+    // otherwise its still-open (possibly memory-mapped) reader can make Windows refuse to rename
+    // the live index directory aside when the rebuild finishes, failing with "Failed to finalize
+    // the new index". search.search() lazily reopens a fresh one on the next query.
+    LaunchedEffect(isIndexing) {
+        if (isIndexing) search.close()
+    }
+
     val initialPreferences = remember { AppPreferencesStore.load() }
     var searchQuery by remember { mutableStateOf("") }
     var searchMode by remember { mutableStateOf(initialPreferences.searchMode) }
