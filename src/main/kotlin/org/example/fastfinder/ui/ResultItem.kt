@@ -5,8 +5,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.Icon
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
@@ -14,18 +18,26 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import org.example.fastfinder.model.SearchFilter
 import org.example.fastfinder.model.SystemItem
 import org.example.fastfinder.ui.theme.AppTheme
 import org.example.fastfinder.ui.theme.LocalAppColors
+import org.example.fastfinder.ui.theme.colorFor
 import org.example.fastfinder.util.formatSize
 import org.example.fastfinder.util.getFileType
+import org.example.fastfinder.util.singularLabel
 import java.awt.Desktop
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
@@ -35,41 +47,107 @@ import java.io.File
 @Composable
 fun ResultItem(item: SystemItem) {
     var isHovered by remember { mutableStateOf(false) }
+    val fileType = remember(item.isFile, item.itemPath) { if (item.isFile) getFileType(File(item.itemPath)) else null }
     val icon = remember(item.isFile, item.itemPath) { iconFor(item) }
-    val sizeLabel = remember(item.itemSize) { item.itemSize?.let(::formatSize) }
+    val sizeLabel = remember(item.itemSize) { item.itemSize?.let(::formatSize) ?: "—" }
     val appColors = LocalAppColors.current
+    val iconTint = fileType?.let { appColors.colorFor(it) } ?: appColors.typeFolder
 
     Row(
         modifier = Modifier
             .onPointerEvent(PointerEventType.Enter) { isHovered = true }
             .onPointerEvent(PointerEventType.Exit) { isHovered = false }
-            .background(color = if (isHovered) appColors.hoverColor else appColors.lazyColumnColor)
+            .background(color = if (isHovered) appColors.hoverColor else Color.Transparent)
             .combinedClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = {},
                 onDoubleClick = { openItem(item.itemPath) },
             )
-            .padding(8.dp)
+            .padding(horizontal = 12.dp, vertical = 7.dp)
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.padding(8.dp))
-
-        Text(text = item.itemPath, modifier = Modifier.padding(8.dp).weight(1f))
-
-        sizeLabel?.let { Text(text = it, modifier = Modifier.padding(8.dp)) }
-
-        if (isHovered) {
-            Icon(
-                AppTheme.copyIcon,
-                contentDescription = "Copy path",
-                modifier = Modifier.padding(8.dp).clickable { copyPathToClipboard(item.itemPath) }
-            )
-            Icon(
-                AppTheme.openFolderIcon,
-                contentDescription = "Open containing folder",
-                modifier = Modifier.padding(8.dp).clickable { openContainingFolder(item.itemPath) }
-            )
+        Box(modifier = Modifier.width(ICON_COLUMN_WIDTH)) {
+            Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.width(18.dp))
         }
+
+        Text(
+            text = item.itemPath.substringAfterLast(File.separatorChar),
+            color = appColors.textPrimary,
+            fontSize = 12.5.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(NAME_COLUMN_WEIGHT).padding(end = 8.dp),
+        )
+        Text(
+            text = item.itemPath,
+            color = appColors.textSecondary,
+            fontSize = 11.5.sp,
+            fontFamily = FontFamily.Monospace,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(PATH_COLUMN_WEIGHT).padding(end = 8.dp),
+        )
+        Text(
+            text = sizeLabel,
+            color = appColors.textPrimary,
+            fontSize = 12.sp,
+            maxLines = 1,
+            modifier = Modifier.width(SIZE_COLUMN_WIDTH),
+        )
+        Text(
+            text = fileType?.singularLabel ?: "Folder",
+            color = appColors.textSecondary,
+            fontSize = 12.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.width(TYPE_COLUMN_WIDTH).padding(start = 8.dp),
+        )
+
+        Row(modifier = Modifier.width(ACTIONS_COLUMN_WIDTH), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (isHovered) {
+                RowActionIcon(
+                    icon = AppTheme.copyIcon,
+                    contentDescription = "Copy path",
+                    onClick = { copyPathToClipboard(item.itemPath) },
+                )
+                RowActionIcon(
+                    icon = AppTheme.openFolderIcon,
+                    contentDescription = "Open containing folder",
+                    onClick = { openContainingFolder(item.itemPath) },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * A per-row hover action icon - sized well past its 14dp glyph (28dp clickable box, with its own
+ * hover highlight) since the glyph alone was too small a target to click reliably.
+ */
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+private fun RowActionIcon(icon: ImageVector, contentDescription: String, onClick: () -> Unit) {
+    var isHovered by remember { mutableStateOf(false) }
+    val appColors = LocalAppColors.current
+
+    Box(
+        modifier = Modifier
+            .width(28.dp)
+            .padding(2.dp)
+            .clip(CircleShape)
+            .background(if (isHovered) appColors.background else Color.Transparent)
+            .onPointerEvent(PointerEventType.Enter) { isHovered = true }
+            .onPointerEvent(PointerEventType.Exit) { isHovered = false }
+            .clickable(onClick = onClick)
+            .padding(5.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            icon,
+            contentDescription = contentDescription,
+            tint = appColors.textSecondary,
+            modifier = Modifier.width(16.dp),
+        )
     }
 }
 

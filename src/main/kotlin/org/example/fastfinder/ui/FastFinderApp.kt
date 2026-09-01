@@ -2,11 +2,10 @@ package org.example.fastfinder.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.darkColors
@@ -125,18 +124,9 @@ fun FastFinderApp(dbManager: DBManager) {
     val appColors = if (isDarkTheme) DarkAppColors else LightAppColors
 
     CompositionLocalProvider(LocalAppColors provides appColors) {
-        MaterialTheme(colors = if (isDarkTheme) darkColors(primary = appColors.buttonColor) else lightColors(primary = appColors.buttonColor)) {
-            Column(modifier = Modifier.fillMaxSize().background(color = appColors.backgroundColor)) {
-                lastError?.let { message ->
-                    ErrorBanner(message = message, onDismiss = dbManager::clearLastError)
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                SearchControls(
-                    searchQuery = searchQuery,
-                    onSearchQueryChange = { searchQuery = it },
-                    onSearch = { runSearch() },
+        MaterialTheme(colors = if (isDarkTheme) darkColors(primary = appColors.accent) else lightColors(primary = appColors.accent)) {
+            Row(modifier = Modifier.fillMaxSize().background(color = appColors.background)) {
+                FilterRail(
                     searchMode = searchMode,
                     onSearchModeChange = { searchMode = it },
                     resultFilter = resultFilter,
@@ -147,21 +137,6 @@ fun FastFinderApp(dbManager: DBManager) {
                     onSortByChange = { sortBy = it },
                     sortAscending = sortAscending,
                     onToggleSortDirection = { sortAscending = !sortAscending },
-                )
-
-                ResultsList(
-                    items = results,
-                    searchMode = searchMode,
-                    resultFilter = resultFilter,
-                    sizeFilter = sizeFilter,
-                    sortBy = sortBy,
-                    sortAscending = sortAscending,
-                    modifier = Modifier.weight(1f).fillMaxWidth().fillMaxHeight().padding(horizontal = 8.dp)
-                )
-
-                StatusBar(
-                    isIndexing = isIndexing,
-                    indexedCount = indexedCount,
                     isDarkTheme = isDarkTheme,
                     onToggleTheme = { isDarkTheme = !isDarkTheme },
                     onCustomSearch = {
@@ -171,8 +146,37 @@ fun FastFinderApp(dbManager: DBManager) {
                             showCustomSearchDialog = true
                         }
                     },
-                    onUpdateDatabase = { dbManager.createOrUpdateIndex(forceIndexCreation = true) }
+                    onUpdateDatabase = { dbManager.createOrUpdateIndex(forceIndexCreation = true) },
                 )
+
+                Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                    lastError?.let { message ->
+                        ErrorBanner(message = message, onDismiss = dbManager::clearLastError)
+                    }
+
+                    SearchBar(
+                        searchQuery = searchQuery,
+                        onSearchQueryChange = { searchQuery = it },
+                        onSearch = { runSearch() },
+                        modifier = Modifier.padding(12.dp),
+                    )
+
+                    ResultsList(
+                        items = results,
+                        searchMode = searchMode,
+                        resultFilter = resultFilter,
+                        sizeFilter = sizeFilter,
+                        sortBy = sortBy,
+                        sortAscending = sortAscending,
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                    )
+
+                    StatusBar(
+                        isIndexing = isIndexing,
+                        indexedCount = indexedCount,
+                        resultCount = results.size,
+                    )
+                }
             }
 
             if (showCustomSearchDialog) {

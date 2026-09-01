@@ -59,6 +59,57 @@ fun getFileType(file: File): SearchFilter = when (file.extension.lowercase()) {
     else -> SearchFilter.OTHER
 }
 
+val SearchMode.label: String
+    get() = when (this) {
+        SearchMode.FILES -> "Files"
+        SearchMode.DIRECTORIES -> "Folders"
+        SearchMode.ALL -> "All"
+    }
+
+val SearchFilter.label: String
+    get() = when (this) {
+        SearchFilter.IMAGE -> "Images"
+        SearchFilter.DOCUMENT -> "Documents"
+        SearchFilter.VIDEO -> "Videos"
+        SearchFilter.AUDIO -> "Audios"
+        SearchFilter.EXECUTABLE -> "Executables"
+        SearchFilter.ARCHIVE -> "Archives"
+        SearchFilter.CODE -> "Code"
+        SearchFilter.OTHER -> "Other"
+        SearchFilter.ALL -> "All Files"
+    }
+
+/** The file's category, singular - used in the results grid's Type column ("Folder" for directories). */
+val SearchFilter.singularLabel: String
+    get() = when (this) {
+        SearchFilter.IMAGE -> "Image"
+        SearchFilter.DOCUMENT -> "Document"
+        SearchFilter.VIDEO -> "Video"
+        SearchFilter.AUDIO -> "Audio"
+        SearchFilter.EXECUTABLE -> "Executable"
+        SearchFilter.ARCHIVE -> "Archive"
+        SearchFilter.CODE -> "Code"
+        SearchFilter.OTHER -> "Other"
+        SearchFilter.ALL -> "File"
+    }
+
+val SortBy.label: String
+    get() = when (this) {
+        SortBy.NAME -> "Name"
+        SortBy.SIZE -> "Size"
+        SortBy.TYPE -> "Type"
+    }
+
+val SizeFilter.label: String
+    get() = when (this) {
+        SizeFilter.ANY -> "Any Size"
+        SizeFilter.UNDER_10KB -> "< 10 KB"
+        SizeFilter.KB10_TO_MB1 -> "10 KB - 1 MB"
+        SizeFilter.MB1_TO_MB100 -> "1 MB - 100 MB"
+        SizeFilter.MB100_TO_GB1 -> "100 MB - 1 GB"
+        SizeFilter.OVER_1GB -> "> 1 GB"
+    }
+
 fun formatSize(size: Long): String {
     val units = listOf("B", "KB", "MB", "GB", "TB")
     var value = size.toDouble()

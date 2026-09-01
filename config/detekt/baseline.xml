@@ -8,32 +8,26 @@
     <ID>FunctionNaming:CustomSearchDialog.kt$@Composable fun CustomSearchDialog( query: String, onQueryChange: (String) -&gt; Unit, onConfirm: () -&gt; Unit, onDismiss: () -&gt; Unit, )</ID>
     <ID>FunctionNaming:ErrorBanner.kt$@Composable fun ErrorBanner(message: String, onDismiss: () -&gt; Unit)</ID>
     <ID>FunctionNaming:FastFinderApp.kt$@Composable fun FastFinderApp(dbManager: DBManager)</ID>
+    <ID>FunctionNaming:FilterRail.kt$@Composable fun FilterRail( searchMode: SearchMode, onSearchModeChange: (SearchMode) -&gt; Unit, resultFilter: SearchFilter, onResultFilterChange: (SearchFilter) -&gt; Unit, sizeFilter: SizeFilter, onSizeFilterChange: (SizeFilter) -&gt; Unit, sortBy: SortBy, onSortByChange: (SortBy) -&gt; Unit, sortAscending: Boolean, onToggleSortDirection: () -&gt; Unit, isDarkTheme: Boolean, onToggleTheme: () -&gt; Unit, onCustomSearch: () -&gt; Unit, onUpdateDatabase: () -&gt; Unit, modifier: Modifier = Modifier, )</ID>
+    <ID>FunctionNaming:FilterRail.kt$@Composable private fun RailActionButton(icon: ImageVector, label: String, onClick: () -&gt; Unit, filled: Boolean)</ID>
+    <ID>FunctionNaming:FilterRail.kt$@Composable private fun RailDropdown(label: String, enabled: Boolean, content: @Composable (close: () -&gt; Unit) -&gt; Unit)</ID>
+    <ID>FunctionNaming:FilterRail.kt$@Composable private fun RailIconButton(icon: ImageVector, contentDescription: String, onClick: () -&gt; Unit)</ID>
+    <ID>FunctionNaming:FilterRail.kt$@Composable private fun RailSection(title: String, content: @Composable () -&gt; Unit)</ID>
+    <ID>FunctionNaming:FilterRail.kt$@Composable private fun ShowSegmentedControl(selected: SearchMode, onSelect: (SearchMode) -&gt; Unit)</ID>
+    <ID>FunctionNaming:ResultItem.kt$@OptIn(ExperimentalComposeUiApi::class) @Composable private fun RowActionIcon(icon: ImageVector, contentDescription: String, onClick: () -&gt; Unit)</ID>
     <ID>FunctionNaming:ResultItem.kt$@OptIn(ExperimentalComposeUiApi::class, ExperimentalFoundationApi::class) @Composable fun ResultItem(item: SystemItem)</ID>
     <ID>FunctionNaming:ResultsList.kt$@Composable fun ResultsList( items: List&lt;SystemItem&gt;, searchMode: SearchMode, resultFilter: SearchFilter, sizeFilter: SizeFilter, sortBy: SortBy, sortAscending: Boolean, modifier: Modifier = Modifier, )</ID>
-    <ID>FunctionNaming:SearchControls.kt$@Composable fun SearchControls( searchQuery: String, onSearchQueryChange: (String) -&gt; Unit, onSearch: () -&gt; Unit, searchMode: SearchMode, onSearchModeChange: (SearchMode) -&gt; Unit, resultFilter: SearchFilter, onResultFilterChange: (SearchFilter) -&gt; Unit, sizeFilter: SizeFilter, onSizeFilterChange: (SizeFilter) -&gt; Unit, sortBy: SortBy, onSortByChange: (SortBy) -&gt; Unit, sortAscending: Boolean, onToggleSortDirection: () -&gt; Unit, )</ID>
+    <ID>FunctionNaming:ResultsList.kt$@Composable private fun ColumnHeader()</ID>
+    <ID>FunctionNaming:ResultsList.kt$@Composable private fun HeaderLabel(text: String, modifier: Modifier)</ID>
+    <ID>FunctionNaming:SearchControls.kt$@Composable fun SearchBar( searchQuery: String, onSearchQueryChange: (String) -&gt; Unit, onSearch: () -&gt; Unit, modifier: Modifier = Modifier, )</ID>
     <ID>FunctionNaming:SearchControls.kt$@Composable private fun ClearSearchButton(searchQuery: String, onSearchQueryChange: (String) -&gt; Unit)</ID>
-    <ID>FunctionNaming:SearchControls.kt$@Composable private fun ResultFilterDropdown(selected: SearchFilter, onSelect: (SearchFilter) -&gt; Unit, enabled: Boolean)</ID>
-    <ID>FunctionNaming:SearchControls.kt$@Composable private fun SearchModeDropdown(selected: SearchMode, onSelect: (SearchMode) -&gt; Unit)</ID>
-    <ID>FunctionNaming:SearchControls.kt$@Composable private fun SizeFilterDropdown(selected: SizeFilter, onSelect: (SizeFilter) -&gt; Unit, enabled: Boolean)</ID>
-    <ID>FunctionNaming:SearchControls.kt$@Composable private fun SortByDropdown(selected: SortBy, onSelect: (SortBy) -&gt; Unit)</ID>
-    <ID>FunctionNaming:StatusBar.kt$@Composable fun StatusBar( isIndexing: Boolean, indexedCount: Int, isDarkTheme: Boolean, onToggleTheme: () -&gt; Unit, onCustomSearch: () -&gt; Unit, onUpdateDatabase: () -&gt; Unit, )</ID>
+    <ID>FunctionNaming:StatusBar.kt$@Composable fun StatusBar( isIndexing: Boolean, indexedCount: Int, resultCount: Int, modifier: Modifier = Modifier, )</ID>
     <ID>LongMethod:FastFinderApp.kt$@Composable fun FastFinderApp(dbManager: DBManager)</ID>
+    <ID>LongMethod:FilterRail.kt$@Composable fun FilterRail( searchMode: SearchMode, onSearchModeChange: (SearchMode) -&gt; Unit, resultFilter: SearchFilter, onResultFilterChange: (SearchFilter) -&gt; Unit, sizeFilter: SizeFilter, onSizeFilterChange: (SizeFilter) -&gt; Unit, sortBy: SortBy, onSortByChange: (SortBy) -&gt; Unit, sortAscending: Boolean, onToggleSortDirection: () -&gt; Unit, isDarkTheme: Boolean, onToggleTheme: () -&gt; Unit, onCustomSearch: () -&gt; Unit, onUpdateDatabase: () -&gt; Unit, modifier: Modifier = Modifier, )</ID>
+    <ID>LongMethod:ResultItem.kt$@OptIn(ExperimentalComposeUiApi::class, ExperimentalFoundationApi::class) @Composable fun ResultItem(item: SystemItem)</ID>
+    <ID>LongParameterList:FilterRail.kt$( searchMode: SearchMode, onSearchModeChange: (SearchMode) -&gt; Unit, resultFilter: SearchFilter, onResultFilterChange: (SearchFilter) -&gt; Unit, sizeFilter: SizeFilter, onSizeFilterChange: (SizeFilter) -&gt; Unit, sortBy: SortBy, onSortByChange: (SortBy) -&gt; Unit, sortAscending: Boolean, onToggleSortDirection: () -&gt; Unit, isDarkTheme: Boolean, onToggleTheme: () -&gt; Unit, onCustomSearch: () -&gt; Unit, onUpdateDatabase: () -&gt; Unit, modifier: Modifier = Modifier, )</ID>
     <ID>LongParameterList:ResultsList.kt$( items: List&lt;SystemItem&gt;, searchMode: SearchMode, resultFilter: SearchFilter, sizeFilter: SizeFilter, sortBy: SortBy, sortAscending: Boolean, modifier: Modifier = Modifier, )</ID>
-    <ID>LongParameterList:SearchControls.kt$( searchQuery: String, onSearchQueryChange: (String) -&gt; Unit, onSearch: () -&gt; Unit, searchMode: SearchMode, onSearchModeChange: (SearchMode) -&gt; Unit, resultFilter: SearchFilter, onResultFilterChange: (SearchFilter) -&gt; Unit, sizeFilter: SizeFilter, onSizeFilterChange: (SizeFilter) -&gt; Unit, sortBy: SortBy, onSortByChange: (SortBy) -&gt; Unit, sortAscending: Boolean, onToggleSortDirection: () -&gt; Unit, )</ID>
-    <ID>LongParameterList:StatusBar.kt$( isIndexing: Boolean, indexedCount: Int, isDarkTheme: Boolean, onToggleTheme: () -&gt; Unit, onCustomSearch: () -&gt; Unit, onUpdateDatabase: () -&gt; Unit, )</ID>
     <ID>LoopWithTooManyJumpStatements:DBManager.kt$DBManager.IndexDirectoryTask$for</ID>
-    <ID>MagicNumber:AppTheme.kt$0xFF0A5EB0</ID>
-    <ID>MagicNumber:AppTheme.kt$0xFF1E1E1E</ID>
-    <ID>MagicNumber:AppTheme.kt$0xFF2B2B2B</ID>
-    <ID>MagicNumber:AppTheme.kt$0xFF3D3D3D</ID>
-    <ID>MagicNumber:AppTheme.kt$0xFF442726</ID>
-    <ID>MagicNumber:AppTheme.kt$0xFF4C8DC9</ID>
-    <ID>MagicNumber:AppTheme.kt$0xFFB3261E</ID>
-    <ID>MagicNumber:AppTheme.kt$0xFFD3D3D3</ID>
-    <ID>MagicNumber:AppTheme.kt$0xFFE5E1DA</ID>
-    <ID>MagicNumber:AppTheme.kt$0xFFF1F0E8</ID>
-    <ID>MagicNumber:AppTheme.kt$0xFFF2B8B5</ID>
-    <ID>MagicNumber:AppTheme.kt$0xFFFCE8E6</ID>
     <ID>MagicNumber:DBManager.kt$DBManager$100</ID>
     <ID>MagicNumber:FastFinderApp.kt$250</ID>
     <ID>MagicNumber:FileTypeUtils.kt$1024</ID>
@@ -60,17 +54,14 @@
     <ID>MaxLineLength:FileTypeUtilsTest.kt$FileTypeUtilsTest$assertEquals(listOf("cherry.txt", "banana.txt", "Apple.txt"), names(items.sortedWith(systemItemComparator(SortBy.NAME, ascending = false))))</ID>
     <ID>MaxLineLength:FileTypeUtilsTest.kt$FileTypeUtilsTest$assertEquals(listOf("large.txt", "medium.txt", "small.txt"), names(items.sortedWith(systemItemComparator(SortBy.SIZE, ascending = false))))</ID>
     <ID>MaxLineLength:FileTypeUtilsTest.kt$FileTypeUtilsTest$assertEquals(listOf("small.txt", "medium.txt", "large.txt"), names(items.sortedWith(systemItemComparator(SortBy.SIZE, ascending = true))))</ID>
-    <ID>MaxLineLength:ResultsList.kt$Box</ID>
     <ID>MaxLineLength:ResultsList.kt$items.filter { it.isVisible(searchMode, resultFilter, sizeFilter) }.sortedWith(systemItemComparator(sortBy, sortAscending))</ID>
     <ID>MaxLineLength:Search.kt$Search$add(LongPoint.newRangeQuery("size", sizeFilter.minBytes, sizeFilter.maxBytes), BooleanClause.Occur.MUST)</ID>
     <ID>MaxLineLength:Search.kt$Search$private</ID>
     <ID>MaxLineLength:Search.kt$Search.&lt;no name provided&gt;$matches.add(SystemItem(file.toAbsolutePath().toString(), isFile = true, itemSize = attrs.size()))</ID>
-    <ID>MaxLineLength:SearchControls.kt$colors = ButtonDefaults.buttonColors(backgroundColor = LocalAppColors.current.buttonColor, contentColor = Color.White)</ID>
     <ID>MaxLineLength:SearchTest.kt$SearchTest$/** Builds a real Lucene index (bypassing [DBManager.createOrUpdateIndex], which always walks real drives) so [Search]'s indexed-search query logic can be exercised directly. */</ID>
     <ID>MaxLineLength:SearchTest.kt$SearchTest$assertEquals(setOf("report.pdf", "report.png"), filesOnly.map { it.itemPath.substringAfterLast(File.separatorChar) }.toSet())</ID>
     <ID>MaxLineLength:SearchTest.kt$SearchTest$val largeOnly = search.search("item", customSearchDirectory = root, searchMode = SearchMode.FILES, sizeFilter = SizeFilter.MB1_TO_MB100)</ID>
     <ID>MaxLineLength:SearchTest.kt$SearchTest$val smallOnly = search.search("item", customSearchDirectory = root, searchMode = SearchMode.FILES, sizeFilter = SizeFilter.UNDER_10KB)</ID>
-    <ID>MaxLineLength:StatusBar.kt$text = "Indexing Database" + if (indexedCount &gt; 0) " - %,d items indexed".format(indexedCount) else ""</ID>
     <ID>MaxLineLength:SwingDialogs.kt$"The database is currently being created. Please wait until indexing is complete, or use Custom Search for a specific folder."</ID>
     <ID>MemberNameEqualsClassName:Search.kt$Search$fun search( query: String, customSearchDirectory: File? = null, searchMode: SearchMode = SearchMode.ALL, resultFilter: SearchFilter = SearchFilter.ALL, sizeFilter: SizeFilter = SizeFilter.ANY, ): List&lt;SystemItem&gt;</ID>
     <ID>NestedBlockDepth:DBManager.kt$DBManager$private fun copyDirectory(source: Path, target: Path)</ID>
