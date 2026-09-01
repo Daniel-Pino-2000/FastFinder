@@ -40,6 +40,10 @@ import org.example.fastfinder.util.label
 
 private val RAIL_WIDTH = 224.dp
 
+/** Type-filter dropdown order: ALL ("All Files") first, then every other category as declared. */
+private val typeFilterOptions: List<SearchFilter> =
+    listOf(SearchFilter.ALL) + SearchFilter.entries.filter { it != SearchFilter.ALL }
+
 /**
  * The persistent left rail: every filter, sort, and app-level action always visible - no
  * dropdown-hunting for the controls used on nearly every search, unlike the old top toolbar.
@@ -81,7 +85,8 @@ fun FilterRail(
                 label = resultFilter.label,
                 enabled = filtersEnabled,
                 content = { close ->
-                    SearchFilter.entries.filter { it != SearchFilter.ALL }.forEach { filter ->
+                    // ALL first, matching every other "no filter" convention in the app (e.g. Search Mode's "All").
+                    typeFilterOptions.forEach { filter ->
                         DropdownMenuItem(onClick = { onResultFilterChange(filter); close() }) { Text(filter.label) }
                     }
                 }
