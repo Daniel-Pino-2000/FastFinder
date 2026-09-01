@@ -81,6 +81,10 @@ fun FastFinderApp(dbManager: DBManager) {
 
     var showCustomSearchDialog by remember { mutableStateOf(false) }
     var customSearchDirectory by remember { mutableStateOf<File?>(null) }
+    // The dialog's own draft query - kept separate from searchQuery so typing into the dialog
+    // doesn't also feed the main search bar underneath it and fire a live search behind the
+    // modal. Only copied into searchQuery once the user confirms.
+    var customSearchQuery by remember { mutableStateOf("") }
     // The folder a confirmed custom search is currently scoped to - distinct from
     // customSearchDirectory (which is just whatever the picker last chose, valid only while the
     // dialog above is open). This one persists after the dialog closes so live search-as-you-type
@@ -160,6 +164,7 @@ fun FastFinderApp(dbManager: DBManager) {
                         val directory = showDirectoryPicker()
                         if (directory != null) {
                             customSearchDirectory = directory
+                            customSearchQuery = searchQuery
                             showCustomSearchDialog = true
                         }
                     },
@@ -204,10 +209,11 @@ fun FastFinderApp(dbManager: DBManager) {
                 customSearchDirectory?.let { directory ->
                     CustomSearchDialog(
                         directory = directory,
-                        query = searchQuery,
-                        onQueryChange = { searchQuery = it },
+                        query = customSearchQuery,
+                        onQueryChange = { customSearchQuery = it },
                         onConfirm = {
                             showCustomSearchDialog = false
+                            searchQuery = customSearchQuery
                             activeCustomSearchDirectory = directory
                             runSearch(directory)
                         },
