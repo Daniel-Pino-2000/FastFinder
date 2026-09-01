@@ -1,5 +1,7 @@
 package org.example.fastfinder.util
 
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.example.fastfinder.model.SearchFilter
 import org.example.fastfinder.model.SearchMode
 import org.example.fastfinder.model.SizeFilter
@@ -28,6 +30,12 @@ data class AppPreferences(
  */
 object AppPreferencesStore {
     private val defaultFile: Path = AppPaths.root.resolve("preferences.properties")
+    // Guards read-modify-write cycles against the file: Main.kt (window size) and FastFinderApp.kt
+    // (theme/filter/sort) each independently load-copy-save it on their own trigger, with no
+    // shared state between them - without this, a resize landing near a filter/theme change could
+    // have one's load() read a snapshot from before the other's save() lands, then silently
+    // overwrite that change when it saves its own.
+    private val mutex = Mutex()
 
     fun load(file: Path = defaultFile): AppPreferences {
         if (!Files.exists(file)) return AppPreferences()
@@ -68,6 +76,11 @@ object AppPreferencesStore {
         } catch (e: IOException) {
             Logger.warn("Could not save preferences: ${e.message}")
         }
+    }
+
+    /** Atomically applies [transform] to the currently-saved preferences - see [mutex]. */
+    suspend fun update(file: Path = defaultFile, transform: (AppPreferences) -> AppPreferences) {
+        mutex.withLock { save(transform(load(file)), file) }
     }
 }
 

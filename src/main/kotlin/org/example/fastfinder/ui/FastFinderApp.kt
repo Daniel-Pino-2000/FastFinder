@@ -97,8 +97,8 @@ fun FastFinderApp(dbManager: DBManager) {
     // same preferences file.
     LaunchedEffect(isDarkTheme, searchMode, resultFilter, sizeFilter, sortBy, sortAscending) {
         withContext(Dispatchers.IO) {
-            AppPreferencesStore.save(
-                AppPreferencesStore.load().copy(
+            AppPreferencesStore.update {
+                it.copy(
                     darkTheme = isDarkTheme,
                     searchMode = searchMode,
                     resultFilter = resultFilter,
@@ -106,7 +106,7 @@ fun FastFinderApp(dbManager: DBManager) {
                     sortBy = sortBy,
                     sortAscending = sortAscending,
                 )
-            )
+            }
         }
     }
 
@@ -213,9 +213,13 @@ fun FastFinderApp(dbManager: DBManager) {
                         onQueryChange = { customSearchQuery = it },
                         onConfirm = {
                             showCustomSearchDialog = false
+                            // Setting these two - not calling runSearch directly - is deliberate:
+                            // both are keys of the live-search LaunchedEffect below, so changing
+                            // them already triggers a search. A direct runSearch call here used to
+                            // race that effect restart (which always cancels the in-flight job
+                            // first) and lose, silently re-querying after another 250ms for nothing.
                             searchQuery = customSearchQuery
                             activeCustomSearchDirectory = directory
-                            runSearch(directory)
                         },
                         onDismiss = { showCustomSearchDialog = false }
                     )

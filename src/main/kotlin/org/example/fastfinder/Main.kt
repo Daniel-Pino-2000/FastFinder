@@ -20,6 +20,8 @@ import java.awt.Dimension
 import java.awt.GraphicsEnvironment
 
 private const val WINDOW_SIZE_SAVE_DEBOUNCE_MS = 500L
+private const val MIN_WINDOW_WIDTH = 800
+private const val MIN_WINDOW_HEIGHT = 600
 
 fun main(args: Array<String>) {
     if (!ensureElevated(args)) return
@@ -38,12 +40,16 @@ fun main(args: Array<String>) {
 private fun ApplicationScope.runApp() {
     val dbManager = remember { DBManager() }
     val initialPreferences = remember { AppPreferencesStore.load() }
-    // Clamp a persisted size to the current screen's usable area (excluding the taskbar) - a size
-    // saved on a larger/different monitor would otherwise reopen oversized or partly off-screen.
+    // Clamp a persisted size to [MIN_WINDOW_WIDTH/HEIGHT, current screen's usable area]. The
+    // upper bound guards against a size saved on a larger/different monitor reopening oversized
+    // or partly off-screen; the lower bound guards against a degenerate persisted value (a
+    // hand-edited or corrupted preferences file) reopening a near-invisible, unusable window -
+    // with no other running instance to fall back to (see SingleInstance), that would otherwise
+    // leave no way to recover short of editing the file directly.
     val screenBounds = remember { GraphicsEnvironment.getLocalGraphicsEnvironment().maximumWindowBounds }
     val windowState = rememberWindowState(
-        width = initialPreferences.windowWidth.coerceAtMost(screenBounds.width).dp,
-        height = initialPreferences.windowHeight.coerceAtMost(screenBounds.height).dp,
+        width = initialPreferences.windowWidth.clampToScreen(MIN_WINDOW_WIDTH, screenBounds.width).dp,
+        height = initialPreferences.windowHeight.clampToScreen(MIN_WINDOW_HEIGHT, screenBounds.height).dp,
     )
 
     LaunchedEffect(dbManager) {
@@ -60,12 +66,12 @@ private fun ApplicationScope.runApp() {
     LaunchedEffect(windowState.size) {
         delay(WINDOW_SIZE_SAVE_DEBOUNCE_MS)
         withContext(Dispatchers.IO) {
-            AppPreferencesStore.save(
-                AppPreferencesStore.load().copy(
+            AppPreferencesStore.update {
+                it.copy(
                     windowWidth = windowState.size.width.value.toInt(),
                     windowHeight = windowState.size.height.value.toInt(),
                 )
-            )
+            }
         }
     }
 
@@ -74,7 +80,14 @@ private fun ApplicationScope.runApp() {
         title = "FastFinder",
         state = windowState,
     ) {
-        window.minimumSize = Dimension(800, 600)
+        window.minimumSize = Dimension(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT)
         FastFinderApp(dbManager)
     }
 }
+
+/**
+ * Clamps a persisted window dimension to [[minimum], the current screen's usable size] -
+ * coerceAtLeast on [screenMax] guards against coerceIn throwing if an unusually small/virtual
+ * display's usable area ends up below [minimum].
+ */
+private fun Int.clampToScreen(minimum: Int, screenMax: Int): Int = coerceIn(minimum, screenMax.coerceAtLeast(minimum))
