@@ -96,9 +96,13 @@ class DBManager(
     private val watcherLazy = lazy { IndexWatcher() }
     private val watcher: IndexWatcher get() = watcherLazy.value
 
-    /** Releases the filesystem watcher's background thread and native watch handles, if started. */
+    /**
+     * Releases the filesystem watcher's background thread/handles (if started) and the index
+     * directory's own handle.
+     */
     fun close() {
         if (watcherLazy.isInitialized()) watcher.close()
+        runCatching { indexDirectory.close() }.onFailure { Logger.warn("Error closing index directory: ${it.message}") }
     }
 
     init {
@@ -682,9 +686,20 @@ class DBManager(
             }
         }
 
-        private fun applyEvent(path: Path, kind: WatchEvent.Kind<*>) {
-            val currentWriter = if (isExcludedFromWatching(path)) null else synchronized(writerLock) { writer }
-            if (currentWriter == null) return
+        /**
+         * The live watcher thread ([processLoop]) and a USN journal catch-up run (on whichever
+         * thread calls [catchUpFromJournal], right after [attachTo] starts that watcher thread)
+         * can both observe and process the *same* path around app startup - e.g. a file that
+         * changes right as the app opens is both a live watch event and part of the catch-up
+         * range. Lucene's [IndexWriter] is safe for concurrent add/delete/commit calls from
+         * multiple threads, but the delete-then-add *pair* below isn't atomic as a unit: two
+         * threads interleaving as delete/delete/add/add for the same path leaves two documents
+         * for one file - which crashed the UI (its results list is keyed by path) once this was
+         * live. synchronized(writerLock) serializes the whole pair against the other thread.
+         */
+        private fun applyEvent(path: Path, kind: WatchEvent.Kind<*>) = synchronized(writerLock) {
+            val currentWriter = if (isExcludedFromWatching(path)) null else writer
+            if (currentWriter == null) return@synchronized
 
             // Vanished/inaccessible by the time we look, or an outright delete event: treat
             // both the same way so the index doesn't go stale either way.
@@ -695,7 +710,7 @@ class DBManager(
                     TermQuery(Term("path", pathString)),
                     PrefixQuery(Term("path", pathString + File.separator)),
                 )
-                return
+                return@synchronized
             }
 
             if (attrs.isDirectory) {
