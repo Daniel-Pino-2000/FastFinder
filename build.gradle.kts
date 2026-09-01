@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "org.example"
-version = "1.0-SNAPSHOT"
+version = "1.0.0"
 
 repositories {
     mavenCentral()
@@ -59,9 +59,21 @@ compose.desktop {
         mainClass = "org.example.fastfinder.MainKt"
 
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
+            // Windows-only app (Explorer integration, Windows-specific restricted-directory
+            // handling, elevation, the NTFS USN journal) - Dmg/Deb would be dead config at best.
+            targetFormats(TargetFormat.Msi)
             packageName = "FastFinder"
             packageVersion = "1.0.0"
+            description = "Instant, filterable full-text search over local files and folders."
+            vendor = "Daniel Pino"
+
+            windows {
+                // Fixed for the life of the app: WiX uses this to recognize a new installer as an
+                // upgrade of an existing install rather than a separate side-by-side one. Once a
+                // version ships without a pinned value here, it can't be safely added
+                // retroactively - each build would otherwise get its own random one.
+                upgradeUuid = "27C964BF-314F-4620-AF24-9A1C863CF536"
+            }
         }
     }
 }
