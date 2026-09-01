@@ -1,5 +1,6 @@
 package org.example.fastfinder.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -61,6 +63,7 @@ fun SearchControls(
             onValueChange = onSearchQueryChange,
             colors = TextFieldDefaults.outlinedTextFieldColors(focusedBorderColor = LocalAppColors.current.buttonColor),
             singleLine = true,
+            trailingIcon = { ClearSearchButton(searchQuery, onSearchQueryChange) },
             modifier = Modifier
                 .weight(1f)
                 .onKeyEvent { event ->
@@ -116,6 +119,17 @@ fun SearchControls(
             )
         }
     }
+}
+
+/** A small "X" that clears the search query in one click - only shown once there's something to clear. */
+@Composable
+private fun ClearSearchButton(searchQuery: String, onSearchQueryChange: (String) -> Unit) {
+    if (searchQuery.isEmpty()) return
+    Icon(
+        Icons.Default.Close,
+        contentDescription = "Clear search",
+        modifier = Modifier.clickable { onSearchQueryChange("") }
+    )
 }
 
 private val SearchMode.label: String
