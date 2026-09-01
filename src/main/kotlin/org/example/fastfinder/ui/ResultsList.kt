@@ -3,15 +3,19 @@ package org.example.fastfinder.ui
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.MaterialTheme
+import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -50,21 +54,33 @@ fun ResultsList(
         listState.scrollToItem(0)
     }
 
-    Box(modifier = modifier.background(color = LocalAppColors.current.lazyColumnColor, shape = RoundedCornerShape(5.dp))) {
-        LazyColumn(
-            state = listState,
-            contentPadding = PaddingValues(8.dp),
-            modifier = Modifier.fillMaxSize()
-        ) {
-            items(visibleItems, key = { it.itemPath }) { item -> ResultItem(item) }
-        }
-
-        VerticalScrollbar(
-            adapter = rememberScrollbarAdapter(listState),
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .fillMaxHeight()
-                .padding(end = 8.dp, top = 24.dp, bottom = 24.dp)
+    Column(modifier = modifier) {
+        Text(
+            text = "%,d result%s".format(visibleItems.size, if (visibleItems.size == 1) "" else "s"),
+            style = MaterialTheme.typography.caption,
+            color = MaterialTheme.colors.onSurface.copy(alpha = 0.7f),
+            modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
         )
+
+        Box(
+            modifier = Modifier.weight(1f).fillMaxWidth()
+                .background(color = LocalAppColors.current.lazyColumnColor, shape = RoundedCornerShape(5.dp))
+        ) {
+            LazyColumn(
+                state = listState,
+                contentPadding = PaddingValues(8.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                items(visibleItems, key = { it.itemPath }) { item -> ResultItem(item) }
+            }
+
+            VerticalScrollbar(
+                adapter = rememberScrollbarAdapter(listState),
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight()
+                    .padding(end = 8.dp, top = 24.dp, bottom = 24.dp)
+            )
+        }
     }
 }

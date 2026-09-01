@@ -19,6 +19,7 @@ object AppTheme {
     val codeFileIcon: ImageVector = Icons.Default.Code
     val folderIcon: ImageVector = Icons.Default.Folder
     val openFolderIcon: ImageVector = Icons.Default.FolderOpen
+    val copyIcon: ImageVector = Icons.Default.ContentCopy
 }
 
 data class AppColors(

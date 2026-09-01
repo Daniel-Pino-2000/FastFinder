@@ -27,6 +27,8 @@ import org.example.fastfinder.ui.theme.LocalAppColors
 import org.example.fastfinder.util.formatSize
 import org.example.fastfinder.util.getFileType
 import java.awt.Desktop
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
 import java.io.File
 
 @OptIn(ExperimentalComposeUiApi::class, ExperimentalFoundationApi::class)
@@ -58,6 +60,11 @@ fun ResultItem(item: SystemItem) {
 
         if (isHovered) {
             Icon(
+                AppTheme.copyIcon,
+                contentDescription = "Copy path",
+                modifier = Modifier.padding(8.dp).clickable { copyPathToClipboard(item.itemPath) }
+            )
+            Icon(
                 AppTheme.openFolderIcon,
                 contentDescription = "Open containing folder",
                 modifier = Modifier.padding(8.dp).clickable { openContainingFolder(item.itemPath) }
@@ -78,6 +85,10 @@ private fun iconFor(item: SystemItem): ImageVector {
         SearchFilter.CODE -> AppTheme.codeFileIcon
         SearchFilter.ALL, SearchFilter.OTHER -> AppTheme.fileIcon
     }
+}
+
+internal fun copyPathToClipboard(path: String) {
+    Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(path), null)
 }
 
 private fun openContainingFolder(path: String) {
