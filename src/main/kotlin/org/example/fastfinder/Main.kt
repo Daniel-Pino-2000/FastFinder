@@ -17,6 +17,7 @@ import org.example.fastfinder.ui.FastFinderApp
 import org.example.fastfinder.util.AppPreferencesStore
 import org.example.fastfinder.util.Logger
 import java.awt.Dimension
+import java.awt.GraphicsEnvironment
 
 private const val WINDOW_SIZE_SAVE_DEBOUNCE_MS = 500L
 
@@ -37,9 +38,12 @@ fun main(args: Array<String>) {
 private fun ApplicationScope.runApp() {
     val dbManager = remember { DBManager() }
     val initialPreferences = remember { AppPreferencesStore.load() }
+    // Clamp a persisted size to the current screen's usable area (excluding the taskbar) - a size
+    // saved on a larger/different monitor would otherwise reopen oversized or partly off-screen.
+    val screenBounds = remember { GraphicsEnvironment.getLocalGraphicsEnvironment().maximumWindowBounds }
     val windowState = rememberWindowState(
-        width = initialPreferences.windowWidth.dp,
-        height = initialPreferences.windowHeight.dp,
+        width = initialPreferences.windowWidth.coerceAtMost(screenBounds.width).dp,
+        height = initialPreferences.windowHeight.coerceAtMost(screenBounds.height).dp,
     )
 
     LaunchedEffect(dbManager) {
