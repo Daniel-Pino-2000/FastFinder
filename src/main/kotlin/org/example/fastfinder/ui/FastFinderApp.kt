@@ -180,15 +180,18 @@ fun FastFinderApp(dbManager: DBManager) {
             }
 
             if (showCustomSearchDialog) {
-                CustomSearchDialog(
-                    query = searchQuery,
-                    onQueryChange = { searchQuery = it },
-                    onConfirm = {
-                        showCustomSearchDialog = false
-                        customSearchDirectory?.let { runSearch(it) }
-                    },
-                    onDismiss = { showCustomSearchDialog = false }
-                )
+                customSearchDirectory?.let { directory ->
+                    CustomSearchDialog(
+                        directory = directory,
+                        query = searchQuery,
+                        onQueryChange = { searchQuery = it },
+                        onConfirm = {
+                            showCustomSearchDialog = false
+                            runSearch(directory)
+                        },
+                        onDismiss = { showCustomSearchDialog = false }
+                    )
+                }
             }
         }
     }

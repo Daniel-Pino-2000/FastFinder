@@ -5,7 +5,7 @@
     <ID>ComplexCondition:Search.kt$Search.&lt;no name provided&gt;$searchMode != SearchMode.DIRECTORIES &amp;&amp; matchesAllTerms(file.fileName.toString(), terms) &amp;&amp; (resultFilter == SearchFilter.ALL || getFileType(file.toFile()) == resultFilter) &amp;&amp; attrs.size() in sizeFilter.minBytes..sizeFilter.maxBytes</ID>
     <ID>CyclomaticComplexMethod:Search.kt$Search$private fun searchIndex(query: String, searchMode: SearchMode, resultFilter: SearchFilter, sizeFilter: SizeFilter): List&lt;SystemItem&gt;</ID>
     <ID>ExplicitGarbageCollectionCall:DBManager.kt$DBManager$gc()</ID>
-    <ID>FunctionNaming:CustomSearchDialog.kt$@Composable fun CustomSearchDialog( query: String, onQueryChange: (String) -&gt; Unit, onConfirm: () -&gt; Unit, onDismiss: () -&gt; Unit, )</ID>
+    <ID>FunctionNaming:CustomSearchDialog.kt$@Composable fun CustomSearchDialog( directory: File, query: String, onQueryChange: (String) -&gt; Unit, onConfirm: () -&gt; Unit, onDismiss: () -&gt; Unit, )</ID>
     <ID>FunctionNaming:ErrorBanner.kt$@Composable fun ErrorBanner(message: String, onDismiss: () -&gt; Unit)</ID>
     <ID>FunctionNaming:FastFinderApp.kt$@Composable fun FastFinderApp(dbManager: DBManager)</ID>
     <ID>FunctionNaming:FilterRail.kt$@Composable fun FilterRail( searchMode: SearchMode, onSearchModeChange: (SearchMode) -&gt; Unit, resultFilter: SearchFilter, onResultFilterChange: (SearchFilter) -&gt; Unit, sizeFilter: SizeFilter, onSizeFilterChange: (SizeFilter) -&gt; Unit, sortBy: SortBy, onSortByChange: (SortBy) -&gt; Unit, sortAscending: Boolean, onToggleSortDirection: () -&gt; Unit, isDarkTheme: Boolean, onToggleTheme: () -&gt; Unit, onCustomSearch: () -&gt; Unit, onUpdateDatabase: () -&gt; Unit, modifier: Modifier = Modifier, )</ID>
@@ -22,6 +22,7 @@
     <ID>FunctionNaming:SearchControls.kt$@Composable fun SearchBar( searchQuery: String, onSearchQueryChange: (String) -&gt; Unit, onSearch: () -&gt; Unit, modifier: Modifier = Modifier, )</ID>
     <ID>FunctionNaming:SearchControls.kt$@Composable private fun ClearSearchButton(searchQuery: String, onSearchQueryChange: (String) -&gt; Unit)</ID>
     <ID>FunctionNaming:StatusBar.kt$@Composable fun StatusBar( isIndexing: Boolean, indexedCount: Int, resultCount: Int, modifier: Modifier = Modifier, )</ID>
+    <ID>LongMethod:CustomSearchDialog.kt$@Composable fun CustomSearchDialog( directory: File, query: String, onQueryChange: (String) -&gt; Unit, onConfirm: () -&gt; Unit, onDismiss: () -&gt; Unit, )</ID>
     <ID>LongMethod:FastFinderApp.kt$@Composable fun FastFinderApp(dbManager: DBManager)</ID>
     <ID>LongMethod:FilterRail.kt$@Composable fun FilterRail( searchMode: SearchMode, onSearchModeChange: (SearchMode) -&gt; Unit, resultFilter: SearchFilter, onResultFilterChange: (SearchFilter) -&gt; Unit, sizeFilter: SizeFilter, onSizeFilterChange: (SizeFilter) -&gt; Unit, sortBy: SortBy, onSortByChange: (SortBy) -&gt; Unit, sortAscending: Boolean, onToggleSortDirection: () -&gt; Unit, isDarkTheme: Boolean, onToggleTheme: () -&gt; Unit, onCustomSearch: () -&gt; Unit, onUpdateDatabase: () -&gt; Unit, modifier: Modifier = Modifier, )</ID>
     <ID>LongMethod:ResultItem.kt$@OptIn(ExperimentalComposeUiApi::class, ExperimentalFoundationApi::class) @Composable fun ResultItem(item: SystemItem)</ID>
