@@ -1,14 +1,20 @@
 package org.example.fastfinder.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.Icon
 import androidx.compose.material.MaterialTheme
+import androidx.compose.material.Text
 import androidx.compose.material.darkColors
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.lightColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -20,8 +26,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -34,6 +45,7 @@ import org.example.fastfinder.model.SizeFilter
 import org.example.fastfinder.model.SortBy
 import org.example.fastfinder.model.SystemItem
 import org.example.fastfinder.search.Search
+import org.example.fastfinder.ui.theme.AppTheme
 import org.example.fastfinder.ui.theme.DarkAppColors
 import org.example.fastfinder.ui.theme.LightAppColors
 import org.example.fastfinder.ui.theme.LocalAppColors
@@ -69,6 +81,11 @@ fun FastFinderApp(dbManager: DBManager) {
 
     var showCustomSearchDialog by remember { mutableStateOf(false) }
     var customSearchDirectory by remember { mutableStateOf<File?>(null) }
+    // The folder a confirmed custom search is currently scoped to - distinct from
+    // customSearchDirectory (which is just whatever the picker last chose, valid only while the
+    // dialog above is open). This one persists after the dialog closes so live search-as-you-type
+    // keeps searching that folder instead of silently falling back to the full index.
+    var activeCustomSearchDirectory by remember { mutableStateOf<File?>(null) }
     var isDarkTheme by remember { mutableStateOf(initialPreferences.darkTheme) }
 
     // Persists theme/filter/sort choices across restarts. Reads the current file before
@@ -113,12 +130,12 @@ fun FastFinderApp(dbManager: DBManager) {
         launchSearch(searchQuery, directory, debounce = false)
     }
 
-    // Live search: re-runs (debounced) whenever the query text or an index-query filter
-    // changes. Deliberately doesn't check isFirstIndexCreation/show a dialog here (unlike
-    // runSearch): Search.search() already no-ops safely while the index isn't ready, and
-    // popping a modal on every keystroke would be a real bug, not just noise.
-    LaunchedEffect(searchQuery, searchMode, resultFilter, sizeFilter) {
-        launchSearch(searchQuery, debounce = true)
+    // Live search: re-runs (debounced) whenever the query text, an index-query filter, or the
+    // active custom-search scope changes. Deliberately doesn't check isFirstIndexCreation/show a
+    // dialog here (unlike runSearch): Search.search() already no-ops safely while the index isn't
+    // ready, and popping a modal on every keystroke would be a real bug, not just noise.
+    LaunchedEffect(searchQuery, searchMode, resultFilter, sizeFilter, activeCustomSearchDirectory) {
+        launchSearch(searchQuery, activeCustomSearchDirectory, debounce = true)
     }
 
     val appColors = if (isDarkTheme) DarkAppColors else LightAppColors
@@ -157,9 +174,13 @@ fun FastFinderApp(dbManager: DBManager) {
                     SearchBar(
                         searchQuery = searchQuery,
                         onSearchQueryChange = { searchQuery = it },
-                        onSearch = { runSearch() },
+                        onSearch = { runSearch(activeCustomSearchDirectory) },
                         modifier = Modifier.padding(12.dp),
                     )
+
+                    activeCustomSearchDirectory?.let { directory ->
+                        CustomSearchIndicator(directory = directory, onClear = { activeCustomSearchDirectory = null })
+                    }
 
                     ResultsList(
                         items = results,
@@ -187,6 +208,7 @@ fun FastFinderApp(dbManager: DBManager) {
                         onQueryChange = { searchQuery = it },
                         onConfirm = {
                             showCustomSearchDialog = false
+                            activeCustomSearchDirectory = directory
                             runSearch(directory)
                         },
                         onDismiss = { showCustomSearchDialog = false }
@@ -194,5 +216,42 @@ fun FastFinderApp(dbManager: DBManager) {
                 }
             }
         }
+    }
+}
+
+/** Shown whenever search is scoped to a folder, so it's never a mystery why results look narrower than expected. */
+@Composable
+private fun CustomSearchIndicator(directory: File, onClear: () -> Unit) {
+    val appColors = LocalAppColors.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(appColors.accent.copy(alpha = 0.12f))
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(AppTheme.folderIcon, contentDescription = null, tint = appColors.accent, modifier = Modifier.size(15.dp))
+        Text(
+            text = "Searching in",
+            color = appColors.accent,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(start = 8.dp, end = 6.dp),
+        )
+        Text(
+            text = directory.absolutePath,
+            color = appColors.textPrimary,
+            fontSize = 12.sp,
+            fontFamily = FontFamily.Monospace,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Icon(
+            Icons.Default.Close,
+            contentDescription = "Exit custom search",
+            tint = appColors.accent,
+            modifier = Modifier.size(14.dp).clickable(onClick = onClear),
+        )
     }
 }

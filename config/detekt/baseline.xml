@@ -8,6 +8,7 @@
     <ID>FunctionNaming:CustomSearchDialog.kt$@Composable fun CustomSearchDialog( directory: File, query: String, onQueryChange: (String) -&gt; Unit, onConfirm: () -&gt; Unit, onDismiss: () -&gt; Unit, )</ID>
     <ID>FunctionNaming:ErrorBanner.kt$@Composable fun ErrorBanner(message: String, onDismiss: () -&gt; Unit)</ID>
     <ID>FunctionNaming:FastFinderApp.kt$@Composable fun FastFinderApp(dbManager: DBManager)</ID>
+    <ID>FunctionNaming:FastFinderApp.kt$@Composable private fun CustomSearchIndicator(directory: File, onClear: () -&gt; Unit)</ID>
     <ID>FunctionNaming:FilterRail.kt$@Composable fun FilterRail( searchMode: SearchMode, onSearchModeChange: (SearchMode) -&gt; Unit, resultFilter: SearchFilter, onResultFilterChange: (SearchFilter) -&gt; Unit, sizeFilter: SizeFilter, onSizeFilterChange: (SizeFilter) -&gt; Unit, sortBy: SortBy, onSortByChange: (SortBy) -&gt; Unit, sortAscending: Boolean, onToggleSortDirection: () -&gt; Unit, isDarkTheme: Boolean, onToggleTheme: () -&gt; Unit, onCustomSearch: () -&gt; Unit, onUpdateDatabase: () -&gt; Unit, modifier: Modifier = Modifier, )</ID>
     <ID>FunctionNaming:FilterRail.kt$@Composable private fun RailActionButton(icon: ImageVector, label: String, onClick: () -&gt; Unit, filled: Boolean)</ID>
     <ID>FunctionNaming:FilterRail.kt$@Composable private fun RailDropdown(label: String, enabled: Boolean, content: @Composable (close: () -&gt; Unit) -&gt; Unit)</ID>
