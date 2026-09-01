@@ -36,6 +36,12 @@ private const val MAX_RESULTS = 5000
  * when done with this instance (e.g. on app shutdown).
  */
 class Search(private val dbManager: DBManager) : AutoCloseable {
+    // Guards openDirectory/searcherManager themselves (not the SearcherManager's own use, which
+    // is already thread-safe per its own contract) - search() runs on Dispatchers.IO while
+    // FastFinderApp calls close() from a separate coroutine right before a rebuild starts.
+    // Without this, close() nulling the fields mid-way through acquireSearcherManager() building
+    // a new pair could silently leak the new FSDirectory/SearcherManager instead of using it.
+    private val lock = Any()
     private var openDirectory: Directory? = null
     private var searcherManager: SearcherManager? = null
 
@@ -54,10 +60,12 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
     }
 
     override fun close() {
-        searcherManager?.close()
-        openDirectory?.close()
-        searcherManager = null
-        openDirectory = null
+        synchronized(lock) {
+            searcherManager?.close()
+            openDirectory?.close()
+            searcherManager = null
+            openDirectory = null
+        }
     }
 
     private fun searchIndex(query: String, searchMode: SearchMode, resultFilter: SearchFilter, sizeFilter: SizeFilter): List<SystemItem> {
@@ -113,9 +121,9 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
         }
     }
 
-    private fun acquireSearcherManager(): SearcherManager? {
-        searcherManager?.let { return it }
-        return try {
+    private fun acquireSearcherManager(): SearcherManager? = synchronized(lock) {
+        searcherManager?.let { return@synchronized it }
+        try {
             val defaultDirectory = dbManager.indexPath.toFile()
             require(defaultDirectory.exists() && defaultDirectory.isDirectory) {
                 "Index path ${defaultDirectory.absolutePath} is invalid."
