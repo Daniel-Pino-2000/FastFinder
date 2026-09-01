@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -58,11 +59,14 @@ fun StatusBar(
                 color = appColors.accent,
             )
         } else {
+            // Text's line box carries more leading above the glyphs than below (a Skia text-metrics
+            // quirk, not fixable by lineHeight alone), so a box-centered icon reads as sitting too
+            // high next to it - nudge the icon down slightly to land on the text's visual center.
             Icon(
                 Icons.Default.CheckCircle,
                 contentDescription = null,
                 tint = appColors.accent,
-                modifier = Modifier.size(12.dp),
+                modifier = Modifier.size(12.dp).offset(y = 1.dp),
             )
             Spacer(modifier = Modifier.width(5.dp))
             Text(text = "Index up to date", color = appColors.accent, fontSize = 11.5.sp, lineHeight = 11.5.sp)
