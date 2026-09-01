@@ -39,6 +39,7 @@ fun StatusBar(
             text = "%,d result%s".format(resultCount, if (resultCount == 1) "" else "s"),
             color = appColors.textSecondary,
             fontSize = 11.5.sp,
+            lineHeight = 11.5.sp,
         )
 
         Spacer(modifier = Modifier.weight(1f))
@@ -48,6 +49,7 @@ fun StatusBar(
                 text = "Indexing Database" + if (indexedCount > 0) " - %,d items indexed".format(indexedCount) else "",
                 color = appColors.textSecondary,
                 fontSize = 11.5.sp,
+                lineHeight = 11.5.sp,
             )
             Spacer(modifier = Modifier.width(8.dp))
             CircularProgressIndicator(
@@ -63,7 +65,7 @@ fun StatusBar(
                 modifier = Modifier.size(12.dp),
             )
             Spacer(modifier = Modifier.width(5.dp))
-            Text(text = "Index up to date", color = appColors.accent, fontSize = 11.5.sp)
+            Text(text = "Index up to date", color = appColors.accent, fontSize = 11.5.sp, lineHeight = 11.5.sp)
         }
     }
 }
