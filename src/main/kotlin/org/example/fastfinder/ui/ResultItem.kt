@@ -35,6 +35,7 @@ import org.example.fastfinder.model.SystemItem
 import org.example.fastfinder.ui.theme.AppTheme
 import org.example.fastfinder.ui.theme.LocalAppColors
 import org.example.fastfinder.ui.theme.colorFor
+import org.example.fastfinder.util.Logger
 import org.example.fastfinder.util.formatSize
 import org.example.fastfinder.util.getFileType
 import org.example.fastfinder.util.singularLabel
@@ -165,14 +166,23 @@ private fun iconFor(item: SystemItem): ImageVector {
     }
 }
 
+/** Best-effort: a locked clipboard (another process briefly holding it) throws IllegalStateException. */
 internal fun copyPathToClipboard(path: String) {
-    Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(path), null)
+    runCatching {
+        Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(path), null)
+    }.onFailure { Logger.warn("Could not copy path to clipboard: ${it.message}") }
 }
 
+/**
+ * Best-effort: Desktop.browse/open throw IOException for very ordinary cases - no shell handler
+ * registered, the file locked by another process - which would otherwise be an uncaught exception
+ * on the composition thread from a single click.
+ */
 private fun openContainingFolder(path: String) {
     val parent = File(path).parentFile
     if (parent != null && parent.exists()) {
-        Desktop.getDesktop().browse(parent.toURI())
+        runCatching { Desktop.getDesktop().browse(parent.toURI()) }
+            .onFailure { Logger.warn("Could not open containing folder for $path: ${it.message}") }
     }
 }
 
@@ -180,6 +190,7 @@ private fun openContainingFolder(path: String) {
 private fun openItem(path: String) {
     val file = File(path)
     if (file.exists()) {
-        Desktop.getDesktop().open(file)
+        runCatching { Desktop.getDesktop().open(file) }
+            .onFailure { Logger.warn("Could not open $path: ${it.message}") }
     }
 }
