@@ -196,6 +196,37 @@ class SearchTest {
     }
 
     @Test
+    fun `indexed search collapses duplicate documents for the same path`(
+        @TempDir tempDir: Path,
+        @TempDir appDataDir: Path,
+    ) {
+        // An unclean shutdown mid-commit (the live watcher's delete+add pair for one path
+        // straddling a forced kill) can leave more than one document for the same path in the
+        // real index. Indexing the same file twice reproduces that here. Search must collapse
+        // it to a single result - the UI list is keyed by path and would crash on a duplicate.
+        val root = File(tempDir.toFile(), "root").apply { mkdirs() }
+        File(root, "duplicate.txt").writeText("x")
+
+        val indexDir = appDataDir.resolve("test-index")
+        Files.createDirectories(indexDir)
+        Files.write(indexDir.resolve("index_state.txt"), listOf("false"))
+        val dbManager = DBManager(indexDirectoryName = "test-index", baseDirectory = appDataDir)
+        FSDirectory.open(dbManager.indexPath).use { directory ->
+            IndexWriter(directory, IndexWriterConfig(StandardAnalyzer())).use { writer ->
+                dbManager.indexFilesAndDirectories(writer, roots = listOf(root))
+                dbManager.indexFilesAndDirectories(writer, roots = listOf(root))
+                writer.commit()
+            }
+        }
+
+        val search = Search(dbManager)
+        val results = search.search("duplicate")
+        search.close()
+
+        assertEquals(1, results.count { it.itemPath.endsWith("duplicate.txt") })
+    }
+
+    @Test
     fun `indexed search honors the size filter`(
         @TempDir tempDir: Path,
         @TempDir appDataDir: Path,

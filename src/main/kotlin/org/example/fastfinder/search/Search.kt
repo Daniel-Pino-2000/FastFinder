@@ -91,6 +91,10 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
                 }.build()
 
                 val topDocs = searcher.search(booleanQuery, MAX_RESULTS)
+                // distinctBy: an unclean shutdown mid-commit (e.g. the live watcher's delete+add
+                // pair for one path straddling a forced kill) can leave more than one document for
+                // the same path until the next full rebuild. The UI list is keyed by path, so a
+                // duplicate here would crash it rather than just look odd - collapse to one per path.
                 topDocs.scoreDocs.mapNotNull { scoreDoc ->
                     val doc = searcher.doc(scoreDoc.doc)
                     val path = doc.get("path") ?: return@mapNotNull null
@@ -99,7 +103,7 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
                         isFile = doc.get("isFile")?.toBoolean() ?: false,
                         itemSize = doc.get("sizeDisplay")?.toLongOrNull()
                     )
-                }
+                }.distinctBy { it.itemPath }
             } finally {
                 manager.release(searcher)
             }
