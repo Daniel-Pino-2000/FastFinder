@@ -28,7 +28,6 @@ object AppTheme {
     val sortDirectionUpIcon: ImageVector = Icons.Default.ArrowUpward
     val sortDirectionDownIcon: ImageVector = Icons.Default.ArrowDownward
     val chevronIcon: ImageVector = Icons.Default.ArrowDropDown
-    val adminSyncIcon: ImageVector = Icons.Default.AdminPanelSettings
 }
 
 /**

@@ -46,6 +46,25 @@ fun showAlreadyRunningMessage() {
 }
 
 /**
+ * Confirms before the settings toggle triggers an elevated relaunch - flipping it doesn't just
+ * flip a setting silently, it restarts the whole app with Administrator access, which deserves a
+ * clear "this is about to happen" moment rather than the window just closing without warning.
+ */
+fun confirmEnableFastSync(): Boolean {
+    val choice = JOptionPane.showConfirmDialog(
+        null,
+        "Enabling fast update tracking restarts FastFinder with Administrator access.\n\n" +
+            "This lets it catch up on file changes instantly instead of a full rescan. " +
+            "Windows will ask you to confirm this.\n\n" +
+            "Restart now?",
+        "Restart Required",
+        JOptionPane.YES_NO_OPTION,
+        JOptionPane.QUESTION_MESSAGE,
+    )
+    return choice == JOptionPane.YES_OPTION
+}
+
+/**
  * Shown when the user opts into fast update tracking (see FilterRail's settings toggle) but then
  * declines the Administrator prompt that follows, or elevation otherwise fails - confirms the
  * setting stayed off rather than leaving them wondering whether it silently took effect.

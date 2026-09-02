@@ -53,12 +53,7 @@ import org.example.fastfinder.util.AppPreferencesStore
 import java.io.File
 
 @Composable
-fun FastFinderApp(
-    dbManager: DBManager,
-    isElevated: Boolean,
-    isAwaitingElevation: Boolean,
-    onEnableFastSync: () -> Unit,
-) {
+fun FastFinderApp(dbManager: DBManager, fastSync: FastSyncState) {
     val search = remember(dbManager) { Search(dbManager) }
     DisposableEffect(search) { onDispose { search.close() } }
 
@@ -174,9 +169,7 @@ fun FastFinderApp(
                         }
                     },
                     onUpdateDatabase = { dbManager.createOrUpdateIndex(forceIndexCreation = true) },
-                    isElevated = isElevated,
-                    isAwaitingElevation = isAwaitingElevation,
-                    onEnableFastSync = onEnableFastSync,
+                    fastSync = fastSync,
                 )
 
                 Column(modifier = Modifier.weight(1f).fillMaxHeight()) {

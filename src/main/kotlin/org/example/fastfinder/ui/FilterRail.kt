@@ -11,11 +11,15 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.DropdownMenu
 import androidx.compose.material.DropdownMenuItem
 import androidx.compose.material.Icon
+import androidx.compose.material.Switch
+import androidx.compose.material.SwitchDefaults
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -64,9 +68,7 @@ fun FilterRail(
     onToggleTheme: () -> Unit,
     onCustomSearch: () -> Unit,
     onUpdateDatabase: () -> Unit,
-    isElevated: Boolean,
-    isAwaitingElevation: Boolean,
-    onEnableFastSync: () -> Unit,
+    fastSync: FastSyncState,
     modifier: Modifier = Modifier,
 ) {
     val appColors = LocalAppColors.current
@@ -131,7 +133,7 @@ fun FilterRail(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        FastSyncRow(isElevated, isAwaitingElevation, onEnableFastSync)
+        FastSyncRow(fastSync)
         Spacer(modifier = Modifier.height(10.dp))
 
         RailActionButton(
@@ -259,66 +261,94 @@ private fun RailIconButton(icon: ImageVector, contentDescription: String, onClic
 }
 
 @Composable
-private fun RailActionButton(
-    icon: ImageVector,
-    label: String,
-    onClick: () -> Unit,
-    filled: Boolean,
-    enabled: Boolean = true,
-) {
+private fun RailActionButton(icon: ImageVector, label: String, onClick: () -> Unit, filled: Boolean) {
     val appColors = LocalAppColors.current
-    val contentColor = when {
-        !enabled -> appColors.textTertiary
-        filled -> appColors.onAccent
-        else -> appColors.textPrimary
-    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(
-                if (filled && enabled) appColors.accent else appColors.surface,
+                if (filled) appColors.accent else appColors.surface,
                 RoundedCornerShape(6.dp),
             )
-            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
+            .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 9.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.height(15.dp))
-        Text(text = label, color = contentColor, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = if (filled) appColors.onAccent else appColors.textSecondary,
+            modifier = Modifier.height(15.dp),
+        )
+        Text(
+            text = label,
+            color = if (filled) appColors.onAccent else appColors.textPrimary,
+            fontSize = 12.5.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 
 /**
  * The opt-in toggle for auto-elevating on launch (see [org.example.fastfinder.Elevation]'s file
- * doc) - off by default, so a new user's first launch never triggers an unexplained admin prompt;
- * enabling it here is what triggers the one and only UAC prompt they'll ever see, in direct
- * response to something they clicked, rather than automatically at startup.
+ * doc) - off by default, so a new user's first launch never triggers an unexplained admin prompt.
+ * The two directions are deliberately asymmetric, because Windows makes them genuinely different
+ * operations: turning it on (while not already elevated) restarts the whole app elevated, so this
+ * confirms that first (see [confirmEnableFastSync]) before triggering the one and only UAC prompt
+ * the user will ever see, in direct response to something they clicked. Turning it off never
+ * restarts anything - a running process can't give back privileges it already has, so this only
+ * ever changes whether the *next* launch auto-elevates; [FastSyncState.isElevated] (this
+ * session's actual, unchangeable state) is reflected separately, in the caption below, rather
+ * than by fighting the switch back on. A plain [Switch] rather than [RailActionButton] here since
+ * this genuinely is an on/off setting, not a one-shot action like the buttons below it.
  */
 @Composable
-private fun FastSyncRow(isElevated: Boolean, isAwaitingElevation: Boolean, onEnableFastSync: () -> Unit) {
+private fun FastSyncRow(fastSync: FastSyncState) {
     val appColors = LocalAppColors.current
     RailSection(title = "Sync") {
-        RailActionButton(
-            icon = AppTheme.adminSyncIcon,
-            label = when {
-                isElevated -> "Fast Update Tracking: On"
-                isAwaitingElevation -> "Waiting for Admin Approval…"
-                else -> "Enable Fast Update Tracking"
-            },
-            onClick = onEnableFastSync,
-            filled = false,
-            enabled = !isElevated && !isAwaitingElevation,
-        )
-        if (!isElevated) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "Requires Administrator access. Instantly catches up on changes made " +
-                    "while FastFinder was closed, instead of a full rescan.",
-                color = appColors.textTertiary,
-                fontSize = 10.5.sp,
-                lineHeight = 14.sp,
-                modifier = Modifier.padding(top = 6.dp, start = 2.dp, end = 2.dp),
+                text = "Fast Update Tracking",
+                color = appColors.textPrimary,
+                fontSize = 12.5.sp,
+                modifier = Modifier.weight(1f),
             )
+            if (fastSync.isAwaitingElevation) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 1.5.dp,
+                    color = appColors.accent,
+                )
+            } else {
+                Switch(
+                    checked = fastSync.fastSyncEnabled,
+                    onCheckedChange = { turningOn ->
+                        when {
+                            !turningOn -> fastSync.onDisable()
+                            fastSync.isElevated || confirmEnableFastSync() -> fastSync.onEnable()
+                        }
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = appColors.accent,
+                        checkedTrackColor = appColors.accent,
+                    ),
+                )
+            }
         }
+        Text(
+            text = when {
+                fastSync.isAwaitingElevation -> "Waiting for the Administrator prompt…"
+                fastSync.isElevated && !fastSync.fastSyncEnabled -> "Off next launch - this " +
+                    "session keeps its current Administrator access until you restart FastFinder."
+                fastSync.fastSyncEnabled -> "On - catching up on changes instantly instead of a full rescan."
+                else -> "Requires Administrator access. Instantly catches up on changes made " +
+                    "while FastFinder was closed, instead of a full rescan."
+            },
+            color = appColors.textTertiary,
+            fontSize = 10.5.sp,
+            lineHeight = 14.sp,
+            modifier = Modifier.padding(top = 6.dp, start = 2.dp, end = 2.dp),
+        )
     }
 }

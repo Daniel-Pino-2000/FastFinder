@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.example.fastfinder.index.DBManager
 import org.example.fastfinder.ui.FastFinderApp
+import org.example.fastfinder.ui.FastSyncState
 import org.example.fastfinder.ui.showAlreadyRunningMessage
 import org.example.fastfinder.ui.showElevationDeclinedMessage
 import org.example.fastfinder.util.AppPreferencesStore
@@ -73,31 +74,50 @@ private fun ApplicationScope.runApp(args: Array<String>) {
     val dbManager = remember { DBManager() }
     val initialPreferences = remember { AppPreferencesStore.load() }
     val coroutineScope = rememberCoroutineScope()
-    // Whether this process itself is currently elevated - not the same as the persisted
-    // preference above, which only reflects whether the *next* launch should try to auto-elevate.
-    // A user can also end up elevated without ever touching the setting (e.g. manually running
-    // the exe "as Administrator"), which this correctly reflects but never writes back to
-    // preferences (only the settings toggle's own successful opt-in does that).
-    // Never reassigned: a successful elevation always exits this process to hand off to a
-    // freshly-relaunched elevated one (see enableFastSync below), so there's no "still this same
-    // session, but now elevated" state to react to - only ever computed once, at startup.
+    // Whether this process itself is currently elevated - fixed for the process's whole
+    // lifetime, unlike fastSyncEnabled below: a successful elevation always exits this process to
+    // hand off to a freshly-relaunched elevated one (see enableFastSync), so there's no "still
+    // this same session, but now elevated" state to react to - only ever computed once, at
+    // startup. A user can also end up elevated without ever touching the setting (e.g. manually
+    // running the exe "as Administrator"); this correctly reflects that either way.
     val isElevated = remember { isProcessElevated() }
+    // The setting as the user currently intends it, which - unlike isElevated - a toggle can
+    // freely flip in either direction without restarting anything: turning it on requires
+    // elevating (a real restart, handled by enableFastSync), but turning it off never does,
+    // since "don't auto-elevate next time" needs no privilege at all to take effect. Starts true
+    // whenever this process is already elevated, even if the preference itself hadn't caught up
+    // yet (e.g. the user launched "as Administrator" manually).
+    var fastSyncEnabled by remember { mutableStateOf(isElevated || initialPreferences.elevationEnabled) }
     var isAwaitingElevation by remember { mutableStateOf(false) }
 
-    // Handles the settings toggle's "enable fast update tracking" action: attempts elevation
-    // right now, at runtime, rather than only ever at startup. A relaunch that succeeds spawns a
-    // brand new elevated process against the same on-disk index, so this one closes its own hold
-    // on it (the watcher's write.lock, its directory handle) before exiting - otherwise the new
-    // process can lose a race attaching its own watcher to an index this one still has locked.
+    // Handles the settings toggle's "enable fast update tracking" action. If this session is
+    // already elevated (the toggle was switched off then straight back on, or the user launched
+    // "as Administrator" manually), there's nothing to restart - just re-arm the preference for
+    // future launches. Otherwise this attempts elevation right now, at runtime, rather than only
+    // ever at startup: a relaunch that succeeds spawns a brand new elevated process that
+    // immediately tries to acquire the very same single-instance lock this one is still holding -
+    // release it first, before anything else here, so that new process doesn't lose the race and
+    // mistake this (about-to-exit) one for a second instance and quit with no window ever shown.
+    // dbManager.close() then releases this process's own hold on the index (the watcher's
+    // write.lock) too, but that failure mode is the graceful one: the new process just logs a
+    // warning and runs without live updates for this session if it loses that particular race,
+    // instead of not opening at all.
     fun enableFastSync() {
-        if (isElevated || isAwaitingElevation) return
+        if (isAwaitingElevation) return
+        if (isElevated) {
+            fastSyncEnabled = true
+            coroutineScope.launch {
+                withContext(Dispatchers.IO) { AppPreferencesStore.update { it.copy(elevationEnabled = true) } }
+            }
+            return
+        }
         isAwaitingElevation = true
         coroutineScope.launch {
             val relaunching = withContext(Dispatchers.IO) { !ensureElevated(args) }
             if (relaunching) {
                 AppPreferencesStore.update { it.copy(elevationEnabled = true) }
-                withContext(Dispatchers.IO) { dbManager.close() }
                 SingleInstance.release()
+                withContext(Dispatchers.IO) { dbManager.close() }
                 exitApplication()
             } else {
                 isAwaitingElevation = false
@@ -106,18 +126,25 @@ private fun ApplicationScope.runApp(args: Array<String>) {
         }
     }
 
-    // Clamp a persisted size to [MIN_WINDOW_WIDTH/HEIGHT, current screen's usable area]. The
-    // upper bound guards against a size saved on a larger/different monitor reopening oversized
-    // or partly off-screen; the lower bound guards against a degenerate persisted value (a
-    // hand-edited or corrupted preferences file) reopening a near-invisible, unusable window -
-    // with no other running instance to fall back to (see SingleInstance), that would otherwise
-    // leave no way to recover short of editing the file directly.
+    // The other direction needs none of enableFastSync's restart machinery: Windows never lets a
+    // running process drop privileges it already has, so a session that's actually elevated stays
+    // elevated regardless of this setting - only the *next* launch reads it, to decide whether to
+    // auto-elevate at all. Flipping it off here just stops that next launch from doing so.
+    fun disableFastSync() {
+        fastSyncEnabled = false
+        coroutineScope.launch {
+            withContext(Dispatchers.IO) { AppPreferencesStore.update { it.copy(elevationEnabled = false) } }
+        }
+    }
+
     val screenBounds = remember { GraphicsEnvironment.getLocalGraphicsEnvironment().maximumWindowBounds }
     val windowState = rememberWindowState(
-        width = (initialPreferences.windowWidth ?: (screenBounds.width * DEFAULT_WINDOW_WIDTH_FRACTION).toInt())
-            .clampToScreen(MIN_WINDOW_WIDTH, screenBounds.width).dp,
-        height = (initialPreferences.windowHeight ?: (screenBounds.height * DEFAULT_WINDOW_HEIGHT_FRACTION).toInt())
-            .clampToScreen(MIN_WINDOW_HEIGHT, screenBounds.height).dp,
+        width = resolveWindowDimension(
+            initialPreferences.windowWidth, MIN_WINDOW_WIDTH, screenBounds.width, DEFAULT_WINDOW_WIDTH_FRACTION,
+        ).dp,
+        height = resolveWindowDimension(
+            initialPreferences.windowHeight, MIN_WINDOW_HEIGHT, screenBounds.height, DEFAULT_WINDOW_HEIGHT_FRACTION,
+        ).dp,
     )
 
     LaunchedEffect(dbManager) {
@@ -151,16 +178,29 @@ private fun ApplicationScope.runApp(args: Array<String>) {
         window.minimumSize = Dimension(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT)
         FastFinderApp(
             dbManager = dbManager,
-            isElevated = isElevated,
-            isAwaitingElevation = isAwaitingElevation,
-            onEnableFastSync = ::enableFastSync,
+            fastSync = FastSyncState(
+                isElevated = isElevated,
+                fastSyncEnabled = fastSyncEnabled,
+                isAwaitingElevation = isAwaitingElevation,
+                onEnable = ::enableFastSync,
+                onDisable = ::disableFastSync,
+            ),
         )
     }
 }
 
 /**
- * Clamps a persisted window dimension to [[minimum], the current screen's usable size] -
- * coerceAtLeast on [screenMax] guards against coerceIn throwing if an unusually small/virtual
- * display's usable area ends up below [minimum].
+ * A persisted window dimension is honored as-is only if it still fits this screen
+ * ([minimum]..[screenMax]) - otherwise (never set, hand-edited/corrupted, or saved on a larger or
+ * differently-scaled display that no longer applies here) this recomputes a fresh
+ * [fraction]-of-screen default rather than merely clamping the stale value down to the screen's
+ * exact edge, which would otherwise make an oversized leftover value from another display look
+ * essentially full-screen here instead of comfortably smaller than it, defeating the point of a
+ * proportional default. coerceAtLeast on [screenMax] guards against coerceIn throwing if an
+ * unusually small/virtual display's usable area ends up below [minimum].
  */
-private fun Int.clampToScreen(minimum: Int, screenMax: Int): Int = coerceIn(minimum, screenMax.coerceAtLeast(minimum))
+private fun resolveWindowDimension(persisted: Int?, minimum: Int, screenMax: Int, fraction: Double): Int {
+    val fitsScreen = persisted != null && persisted in minimum..screenMax
+    val value = if (fitsScreen) persisted!! else (screenMax * fraction).toInt()
+    return value.coerceIn(minimum, screenMax.coerceAtLeast(minimum))
+}
