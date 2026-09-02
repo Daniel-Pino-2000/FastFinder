@@ -108,6 +108,29 @@ class DBManagerWatcherTest {
     }
 
     @Test
+    fun `a file renamed after indexing appears only under its new name`(@TempDir tempDir: Path) {
+        val root = File(tempDir.toFile(), "root").apply { mkdirs() }
+        val original = File(root, "before.txt").apply { writeText("content") }
+        val dbManager = newDbManager(tempDir)
+        try {
+            dbManager.createOrUpdateIndex(forceIndexCreation = true, roots = listOf(root))
+            awaitIndexingDone(dbManager)
+            awaitCondition { hitCountFor(dbManager.indexPath, original) > 0 }
+
+            val renamed = File(root, "after.txt")
+            assertTrue(original.renameTo(renamed), "Test setup: rename must succeed")
+
+            awaitCondition { hitCountFor(dbManager.indexPath, renamed) > 0 }
+            assertEquals(
+                0L, hitCountFor(dbManager.indexPath, original),
+                "Renaming should remove the old path's document, not leave it alongside the new one"
+            )
+        } finally {
+            dbManager.close()
+        }
+    }
+
+    @Test
     fun `a directory pasted in with existing contents is indexed recursively`(@TempDir tempDir: Path) {
         val root = File(tempDir.toFile(), "root").apply { mkdirs() }
         val dbManager = newDbManager(tempDir)

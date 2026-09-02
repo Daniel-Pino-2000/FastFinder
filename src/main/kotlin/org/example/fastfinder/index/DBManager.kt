@@ -662,13 +662,24 @@ class DBManager(
             if (dirty) commit()
         }
 
-        private fun applyPendingEvents(key: WatchKey): Boolean {
+        /**
+         * Holds writerLock for the whole batch, not just each event's own [applyEvent] call
+         * (reentrant, so that inner locking is harmless) - a multi-event change like a rename
+         * (delivered as a DELETE of the old name plus a CREATE of the new one) used to have its
+         * two events processed under separate lock acquisitions, leaving a window between them
+         * for a concurrent [detach] (e.g. the settings toggle's elevation restart, or a full
+         * rebuild) to null out the writer. Whichever event came after that window then silently
+         * no-opped against a null writer, leaving the index with either a stale duplicate (the
+         * old name's delete dropped) or a missing file (the new name's create dropped) depending
+         * on which of the pair happened to be ordered second.
+         */
+        private fun applyPendingEvents(key: WatchKey): Boolean = synchronized(writerLock) {
             var sawEvent = false
             for (event in key.pollEvents()) {
                 if (applyEventSafely(key, event)) sawEvent = true
             }
             if (!key.reset()) registeredRoots.values.remove(key)
-            return sawEvent
+            sawEvent
         }
 
         private fun applyEventSafely(key: WatchKey, event: WatchEvent<*>): Boolean {
