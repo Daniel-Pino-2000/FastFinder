@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -252,13 +253,18 @@ private fun RailDropdown(label: String, enabled: Boolean, content: @Composable (
                 text = label,
                 color = if (enabled) appColors.textPrimary else appColors.textTertiary,
                 fontSize = 12.5.sp,
+                lineHeight = 12.5.sp,
                 modifier = Modifier.weight(1f),
             )
+            // Text's line box carries more leading above the glyphs than below (a Skia
+            // text-metrics quirk, not fixable by lineHeight alone - see StatusBar.kt), so a
+            // box-centered icon reads as sitting too high next to it - nudge down slightly to
+            // land on the text's visual center.
             Icon(
                 AppTheme.chevronIcon,
                 contentDescription = null,
                 tint = appColors.textTertiary,
-                modifier = Modifier.height(16.dp),
+                modifier = Modifier.height(16.dp).offset(y = 1.dp),
             )
         }
 
@@ -309,16 +315,21 @@ private fun RailActionButton(icon: ImageVector, label: String, onClick: () -> Un
         horizontalArrangement = Arrangement.spacedBy(8.dp, alignment = Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // Text's line box carries more leading above the glyphs than below (a Skia
+        // text-metrics quirk, not fixable by lineHeight alone - see StatusBar.kt), so a
+        // box-centered icon reads as sitting too high next to it - nudge down slightly to
+        // land on the text's visual center.
         Icon(
             icon,
             contentDescription = null,
             tint = if (filled) appColors.onAccent else appColors.textSecondary,
-            modifier = Modifier.height(15.dp),
+            modifier = Modifier.height(15.dp).offset(y = 1.dp),
         )
         Text(
             text = label,
             color = if (filled) appColors.onAccent else appColors.textPrimary,
             fontSize = 12.5.sp,
+            lineHeight = 12.5.sp,
             fontWeight = FontWeight.SemiBold,
         )
     }
