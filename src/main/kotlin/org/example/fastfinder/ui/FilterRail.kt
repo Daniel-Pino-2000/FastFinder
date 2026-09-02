@@ -239,7 +239,11 @@ private fun RailDropdown(label: String, enabled: Boolean, content: @Composable (
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(appColors.surface, RoundedCornerShape(6.dp))
+                // clip before clickable: without it, the ripple clickable draws is a plain
+                // rectangle ignoring this shape entirely, so it visibly overshoots the rounded
+                // corners in a square instead of following them.
+                .clip(RoundedCornerShape(6.dp))
+                .background(appColors.surface)
                 .then(if (enabled) Modifier.clickable { expanded = true } else Modifier)
                 .padding(horizontal = 10.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -271,7 +275,10 @@ private fun RailIconButton(icon: ImageVector, contentDescription: String, onClic
         modifier = Modifier
             .height(34.dp)
             .width(34.dp)
-            .background(appColors.surface, RoundedCornerShape(6.dp))
+            // clip before clickable: without it, the ripple ignores this shape and visibly
+            // overshoots the rounded corners in a square instead of following them.
+            .clip(RoundedCornerShape(6.dp))
+            .background(appColors.surface)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -290,10 +297,10 @@ private fun RailActionButton(icon: ImageVector, label: String, onClick: () -> Un
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(
-                if (filled) appColors.accent else appColors.surface,
-                RoundedCornerShape(6.dp),
-            )
+            // clip before clickable: without it, the ripple ignores this shape and visibly
+            // overshoots the rounded corners in a square instead of following them.
+            .clip(RoundedCornerShape(6.dp))
+            .background(if (filled) appColors.accent else appColors.surface)
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 9.dp),
         // Centered, not left-aligned: fillMaxWidth() gives this Row the whole rail's width, but
