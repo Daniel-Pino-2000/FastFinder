@@ -160,19 +160,23 @@ fun FastFinderApp(dbManager: DBManager, fastSync: FastSyncState) {
                     onToggleSortDirection = { sortAscending = !sortAscending },
                     isDarkTheme = isDarkTheme,
                     onToggleTheme = { isDarkTheme = !isDarkTheme },
-                    // Off the main/Compose-render thread: JFileChooser's modal dialog blocks
-                    // whichever thread shows it until dismissed, and that thread also drives
-                    // Compose's own frame scheduling - calling showDirectoryPicker() directly here
-                    // froze the whole window's animations for as long as the picker was open.
+                    // Only the blocking picker call moves to Dispatchers.IO: JFileChooser's modal
+                    // dialog blocks whichever thread shows it until dismissed, and that thread
+                    // also drives Compose's own frame scheduling - calling showDirectoryPicker()
+                    // directly here froze the whole window's animations for as long as the picker
+                    // was open. The coroutine itself stays on coroutineScope's own dispatcher (set
+                    // up by rememberCoroutineScope() to match Compose's own), so the state updates
+                    // after the withContext block resume there automatically - no need to name
+                    // Dispatchers.Main explicitly, which would need a coroutines-swing/-javafx
+                    // dependency this project doesn't have ("Module with the Main dispatcher is
+                    // missing" at runtime otherwise).
                     onCustomSearch = {
-                        coroutineScope.launch(Dispatchers.IO) {
-                            val directory = showDirectoryPicker()
+                        coroutineScope.launch {
+                            val directory = withContext(Dispatchers.IO) { showDirectoryPicker() }
                             if (directory != null) {
-                                withContext(Dispatchers.Main) {
-                                    customSearchDirectory = directory
-                                    customSearchQuery = searchQuery
-                                    showCustomSearchDialog = true
-                                }
+                                customSearchDirectory = directory
+                                customSearchQuery = searchQuery
+                                showCustomSearchDialog = true
                             }
                         }
                     },
