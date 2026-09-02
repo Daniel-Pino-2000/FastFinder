@@ -1,5 +1,7 @@
 package org.example.fastfinder
 
+import org.example.fastfinder.ui.showElevationExplanationMessage
+import org.example.fastfinder.util.AppPreferencesStore
 import org.example.fastfinder.util.Logger
 import java.io.IOException
 import java.nio.file.Paths
@@ -24,6 +26,8 @@ fun ensureElevated(args: Array<String>): Boolean {
     // so a persistent detection failure can't turn into an infinite relaunch loop.
     if (ELEVATED_RELAUNCH_FLAG in args || isRunningElevated()) return true
 
+    explainElevationOnFirstEncounter()
+
     Logger.info("Not running elevated; attempting to relaunch as Administrator.")
     val relaunched = relaunchElevated()
     if (!relaunched) {
@@ -33,6 +37,19 @@ fun ensureElevated(args: Array<String>): Boolean {
         )
     }
     return !relaunched
+}
+
+/**
+ * Shows [showElevationExplanationMessage] the first time this install is ever about to trigger a
+ * UAC prompt, then remembers that it did so it never shows again - synchronous plain load/save
+ * rather than [AppPreferencesStore.update] since this runs in main() before Compose (and that
+ * store's coroutine-mutex machinery) exists, when nothing else can be writing preferences yet.
+ */
+private fun explainElevationOnFirstEncounter() {
+    val preferences = AppPreferencesStore.load()
+    if (preferences.hasSeenElevationExplanation) return
+    showElevationExplanationMessage()
+    AppPreferencesStore.save(preferences.copy(hasSeenElevationExplanation = true))
 }
 
 /** `net session` fails fast for a non-admin and succeeds for an admin - a standard, well-known Windows check. */

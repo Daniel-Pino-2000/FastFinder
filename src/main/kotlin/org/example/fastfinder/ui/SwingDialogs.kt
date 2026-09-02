@@ -43,3 +43,23 @@ fun showAlreadyRunningMessage() {
         JOptionPane.INFORMATION_MESSAGE
     )
 }
+
+/**
+ * Shown once ever, right before the very first Windows UAC prompt this install triggers (see
+ * [org.example.fastfinder.Elevation]) - without it, a new user's first encounter with FastFinder
+ * would be an unexplained admin-access prompt with no context for why a search tool needs it.
+ */
+fun showElevationExplanationMessage() {
+    JOptionPane.showMessageDialog(
+        null,
+        "FastFinder is about to request Administrator access.\n\n" +
+            "This lets it read the Windows NTFS USN Journal, so it can instantly catch up on " +
+            "files that changed while it wasn't running - instead of rescanning your drives " +
+            "from scratch every time it starts.\n\n" +
+            "If you choose \"No\" on the prompt that follows, FastFinder still works normally - " +
+            "it just won't be able to catch up on those offline changes as precisely.\n\n" +
+            "You'll only see this explanation once.",
+        "Why FastFinder Requests Administrator Access",
+        JOptionPane.INFORMATION_MESSAGE
+    )
+}

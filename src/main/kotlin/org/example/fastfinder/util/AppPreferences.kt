@@ -21,6 +21,11 @@ data class AppPreferences(
     val sortAscending: Boolean = true,
     val windowWidth: Int = 1030,
     val windowHeight: Int = 700,
+    // Gates the one-time dialog explaining why FastFinder requests Administrator access (see
+    // Elevation.kt) - read/written directly from main(), before elevation and before Compose
+    // (and this store's own mutex-guarded update()) exist, so it must be a plain field here
+    // rather than a separate file with its own concurrency story.
+    val hasSeenElevationExplanation: Boolean = false,
 )
 
 /**
@@ -52,6 +57,7 @@ object AppPreferencesStore {
                 sortAscending = props.getProperty("sortAscending").toBooleanOr(true),
                 windowWidth = props.getProperty("windowWidth")?.toIntOrNull() ?: 1030,
                 windowHeight = props.getProperty("windowHeight")?.toIntOrNull() ?: 700,
+                hasSeenElevationExplanation = props.getProperty("hasSeenElevationExplanation").toBooleanOr(false),
             )
         } catch (e: IOException) {
             Logger.warn("Could not read preferences file, falling back to defaults: ${e.message}")
@@ -69,6 +75,7 @@ object AppPreferencesStore {
             setProperty("sortAscending", preferences.sortAscending.toString())
             setProperty("windowWidth", preferences.windowWidth.toString())
             setProperty("windowHeight", preferences.windowHeight.toString())
+            setProperty("hasSeenElevationExplanation", preferences.hasSeenElevationExplanation.toString())
         }
         try {
             Files.createDirectories(file.toAbsolutePath().parent)
