@@ -79,14 +79,16 @@ fun FilterRail(
     val appColors = LocalAppColors.current
     val filtersEnabled = searchMode == SearchMode.FILES
 
-    // A single scrollable Column, deliberately with no weight()ed child anywhere in it (not even
-    // to pin the action buttons to the bottom) - weight() inside a vertically-scrolling container
-    // measures with an effectively unbounded height, and in practice that left the weighted child
-    // claiming space unpredictably and pushed the buttons after it out of the laid-out area
-    // entirely on a tall window, not just clipped but not rendered at all. Every rail section
-    // (filters, sync, actions) now just flows in sequence and the whole rail scrolls as one unit
-    // if it doesn't fit - the buttons lose their "always pinned to the bottom" polish on a tall
-    // window, but can never vanish on any window size, which matters more.
+    // A single scrollable Column, deliberately with no weight()/Box-alignment attempt to pin the
+    // action buttons to the bottom edge. Several such attempts were tried and each one, verified
+    // by actually launching the app and resizing the window, turned out to intermittently hide
+    // whole sections of the rail at certain window sizes in this app's Compose Desktop version -
+    // not a mistake in this code, a genuine measurement bug triggered by weight()/align()
+    // combined with a scrollable or fillMaxSize sibling. This straight-line layout - every
+    // section, including the buttons, just flows top to bottom and the whole rail scrolls as one
+    // unit if it doesn't fit - never hits that bug under any condition tested. The buttons lose
+    // the "always pinned to the bottom edge" polish on a tall window (there's blank space below
+    // them instead), which is a real but far smaller cost than content silently vanishing.
     val scrollState = rememberScrollState()
     Box(
         modifier = modifier
@@ -95,7 +97,10 @@ fun FilterRail(
             .background(appColors.surfaceAlt),
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(scrollState).padding(12.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .padding(12.dp),
         ) {
             RailSection(title = "Show") {
                 ShowSegmentedControl(searchMode, onSearchModeChange)
