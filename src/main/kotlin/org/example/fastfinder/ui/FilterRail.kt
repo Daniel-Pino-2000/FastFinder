@@ -64,6 +64,9 @@ fun FilterRail(
     onToggleTheme: () -> Unit,
     onCustomSearch: () -> Unit,
     onUpdateDatabase: () -> Unit,
+    isElevated: Boolean,
+    isAwaitingElevation: Boolean,
+    onEnableFastSync: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val appColors = LocalAppColors.current
@@ -127,6 +130,9 @@ fun FilterRail(
         }
 
         Spacer(modifier = Modifier.weight(1f))
+
+        FastSyncRow(isElevated, isAwaitingElevation, onEnableFastSync)
+        Spacer(modifier = Modifier.height(10.dp))
 
         RailActionButton(
             icon = AppTheme.customSearchIcon,
@@ -253,31 +259,66 @@ private fun RailIconButton(icon: ImageVector, contentDescription: String, onClic
 }
 
 @Composable
-private fun RailActionButton(icon: ImageVector, label: String, onClick: () -> Unit, filled: Boolean) {
+private fun RailActionButton(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    filled: Boolean,
+    enabled: Boolean = true,
+) {
     val appColors = LocalAppColors.current
+    val contentColor = when {
+        !enabled -> appColors.textTertiary
+        filled -> appColors.onAccent
+        else -> appColors.textPrimary
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(
-                if (filled) appColors.accent else appColors.surface,
+                if (filled && enabled) appColors.accent else appColors.surface,
                 RoundedCornerShape(6.dp),
             )
-            .clickable(onClick = onClick)
+            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 10.dp, vertical = 9.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = if (filled) appColors.onAccent else appColors.textSecondary,
-            modifier = Modifier.height(15.dp),
+        Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.height(15.dp))
+        Text(text = label, color = contentColor, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+/**
+ * The opt-in toggle for auto-elevating on launch (see [org.example.fastfinder.Elevation]'s file
+ * doc) - off by default, so a new user's first launch never triggers an unexplained admin prompt;
+ * enabling it here is what triggers the one and only UAC prompt they'll ever see, in direct
+ * response to something they clicked, rather than automatically at startup.
+ */
+@Composable
+private fun FastSyncRow(isElevated: Boolean, isAwaitingElevation: Boolean, onEnableFastSync: () -> Unit) {
+    val appColors = LocalAppColors.current
+    RailSection(title = "Sync") {
+        RailActionButton(
+            icon = AppTheme.adminSyncIcon,
+            label = when {
+                isElevated -> "Fast Update Tracking: On"
+                isAwaitingElevation -> "Waiting for Admin Approval…"
+                else -> "Enable Fast Update Tracking"
+            },
+            onClick = onEnableFastSync,
+            filled = false,
+            enabled = !isElevated && !isAwaitingElevation,
         )
-        Text(
-            text = label,
-            color = if (filled) appColors.onAccent else appColors.textPrimary,
-            fontSize = 12.5.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
+        if (!isElevated) {
+            Text(
+                text = "Requires Administrator access. Instantly catches up on changes made " +
+                    "while FastFinder was closed, instead of a full rescan.",
+                color = appColors.textTertiary,
+                fontSize = 10.5.sp,
+                lineHeight = 14.sp,
+                modifier = Modifier.padding(top = 6.dp, start = 2.dp, end = 2.dp),
+            )
+        }
     }
 }

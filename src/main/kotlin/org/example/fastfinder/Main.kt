@@ -3,7 +3,11 @@ package org.example.fastfinder
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Window
@@ -11,10 +15,12 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.example.fastfinder.index.DBManager
 import org.example.fastfinder.ui.FastFinderApp
 import org.example.fastfinder.ui.showAlreadyRunningMessage
+import org.example.fastfinder.ui.showElevationDeclinedMessage
 import org.example.fastfinder.util.AppPreferencesStore
 import org.example.fastfinder.util.Logger
 import java.awt.Dimension
@@ -43,7 +49,13 @@ fun main(args: Array<String>) {
         return
     }
 
-    if (!ensureElevated(args)) {
+    // Elevation is opt-in (see Elevation.kt's file doc) - only attempted here at all if this
+    // *is* the elevated relaunch of an earlier process, or a returning user already turned on
+    // fast update tracking last session. A first-ever launch skips this entirely: no UAC prompt,
+    // no "why is this app asking for admin" moment. Enabling the setting for the first time is
+    // instead handled at runtime, from the settings toggle in FastFinderApp/FilterRail.
+    val wantsElevation = isElevatedRelaunch(args) || AppPreferencesStore.load().elevationEnabled
+    if (wantsElevation && !ensureElevated(args)) {
         // This process only relaunched itself elevated and is about to exit - release the lock
         // explicitly rather than waiting on process exit, so the elevated child it just spawned
         // doesn't fail its own acquire() while this one is still shutting down.
@@ -52,14 +64,48 @@ fun main(args: Array<String>) {
     }
 
     application {
-        runApp()
+        runApp(args)
     }
 }
 
 @Composable
-private fun ApplicationScope.runApp() {
+private fun ApplicationScope.runApp(args: Array<String>) {
     val dbManager = remember { DBManager() }
     val initialPreferences = remember { AppPreferencesStore.load() }
+    val coroutineScope = rememberCoroutineScope()
+    // Whether this process itself is currently elevated - not the same as the persisted
+    // preference above, which only reflects whether the *next* launch should try to auto-elevate.
+    // A user can also end up elevated without ever touching the setting (e.g. manually running
+    // the exe "as Administrator"), which this correctly reflects but never writes back to
+    // preferences (only the settings toggle's own successful opt-in does that).
+    // Never reassigned: a successful elevation always exits this process to hand off to a
+    // freshly-relaunched elevated one (see enableFastSync below), so there's no "still this same
+    // session, but now elevated" state to react to - only ever computed once, at startup.
+    val isElevated = remember { isProcessElevated() }
+    var isAwaitingElevation by remember { mutableStateOf(false) }
+
+    // Handles the settings toggle's "enable fast update tracking" action: attempts elevation
+    // right now, at runtime, rather than only ever at startup. A relaunch that succeeds spawns a
+    // brand new elevated process against the same on-disk index, so this one closes its own hold
+    // on it (the watcher's write.lock, its directory handle) before exiting - otherwise the new
+    // process can lose a race attaching its own watcher to an index this one still has locked.
+    fun enableFastSync() {
+        if (isElevated || isAwaitingElevation) return
+        isAwaitingElevation = true
+        coroutineScope.launch {
+            val relaunching = withContext(Dispatchers.IO) { !ensureElevated(args) }
+            if (relaunching) {
+                AppPreferencesStore.update { it.copy(elevationEnabled = true) }
+                withContext(Dispatchers.IO) { dbManager.close() }
+                SingleInstance.release()
+                exitApplication()
+            } else {
+                isAwaitingElevation = false
+                showElevationDeclinedMessage()
+            }
+        }
+    }
+
     // Clamp a persisted size to [MIN_WINDOW_WIDTH/HEIGHT, current screen's usable area]. The
     // upper bound guards against a size saved on a larger/different monitor reopening oversized
     // or partly off-screen; the lower bound guards against a degenerate persisted value (a
@@ -103,7 +149,12 @@ private fun ApplicationScope.runApp() {
         state = windowState,
     ) {
         window.minimumSize = Dimension(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT)
-        FastFinderApp(dbManager)
+        FastFinderApp(
+            dbManager = dbManager,
+            isElevated = isElevated,
+            isAwaitingElevation = isAwaitingElevation,
+            onEnableFastSync = ::enableFastSync,
+        )
     }
 }
 

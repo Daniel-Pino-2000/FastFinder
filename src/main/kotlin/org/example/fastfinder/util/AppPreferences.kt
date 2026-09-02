@@ -26,11 +26,13 @@ data class AppPreferences(
     // this file has no access to the current screen's bounds.
     val windowWidth: Int? = null,
     val windowHeight: Int? = null,
-    // Gates the one-time dialog explaining why FastFinder requests Administrator access (see
-    // Elevation.kt) - read/written directly from main(), before elevation and before Compose
-    // (and this store's own mutex-guarded update()) exist, so it must be a plain field here
-    // rather than a separate file with its own concurrency story.
-    val hasSeenElevationExplanation: Boolean = false,
+    // Opt-in for auto-elevating via UAC on launch, so FastFinder can use the NTFS USN journal to
+    // catch up on filesystem changes instantly instead of a full rescan (see Elevation.kt) - off
+    // by default, so a new user's first launch never triggers an unexplained admin prompt. Read
+    // directly from main() before Compose (and this store's own mutex-guarded update()) exist,
+    // and set back to true only after the user explicitly enables it and elevation succeeds (see
+    // FastFinderApp's settings toggle).
+    val elevationEnabled: Boolean = false,
 )
 
 /**
@@ -62,7 +64,7 @@ object AppPreferencesStore {
                 sortAscending = props.getProperty("sortAscending").toBooleanOr(true),
                 windowWidth = props.getProperty("windowWidth")?.toIntOrNull(),
                 windowHeight = props.getProperty("windowHeight")?.toIntOrNull(),
-                hasSeenElevationExplanation = props.getProperty("hasSeenElevationExplanation").toBooleanOr(false),
+                elevationEnabled = props.getProperty("elevationEnabled").toBooleanOr(false),
             )
         } catch (e: IOException) {
             Logger.warn("Could not read preferences file, falling back to defaults: ${e.message}")
@@ -83,7 +85,7 @@ object AppPreferencesStore {
             // from "explicitly set to some value" on the next read.
             preferences.windowWidth?.let { setProperty("windowWidth", it.toString()) }
             preferences.windowHeight?.let { setProperty("windowHeight", it.toString()) }
-            setProperty("hasSeenElevationExplanation", preferences.hasSeenElevationExplanation.toString())
+            setProperty("elevationEnabled", preferences.elevationEnabled.toString())
         }
         try {
             Files.createDirectories(file.toAbsolutePath().parent)

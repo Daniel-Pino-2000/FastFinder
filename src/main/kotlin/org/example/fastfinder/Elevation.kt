@@ -1,7 +1,5 @@
 package org.example.fastfinder
 
-import org.example.fastfinder.ui.showElevationExplanationMessage
-import org.example.fastfinder.util.AppPreferencesStore
 import org.example.fastfinder.util.Logger
 import java.io.IOException
 import java.nio.file.Paths
@@ -11,11 +9,24 @@ private const val ELEVATED_RELAUNCH_FLAG = "--elevated-relaunch"
 private const val RELAUNCH_TIMEOUT_SECONDS = 60L
 private const val MAIN_CLASS = "org.example.fastfinder.MainKt"
 
+/*
+ * FastFinder runs unelevated by default; elevating (see [ensureElevated]) is opt-in, gated by the
+ * user turning on "fast update tracking" in the settings rail (see FastFinderApp/FilterRail) so
+ * it can use the NTFS USN journal to catch up on filesystem changes instantly instead of a full
+ * rescan (see [org.example.fastfinder.index.UsnJournalReader]) - opening a volume handle for that
+ * is restricted to administrators. Main.kt only calls [ensureElevated] at all when that
+ * preference is already on (a returning user) or args carries [ELEVATED_RELAUNCH_FLAG] (this
+ * process *is* the elevated relaunch); the settings toggle calls it directly, at runtime, the
+ * first time a user opts in.
+ */
+
+/** True if [args] mark this process as the elevated relaunch of an earlier, unelevated one. */
+internal fun isElevatedRelaunch(args: Array<String>): Boolean = ELEVATED_RELAUNCH_FLAG in args
+
+/** Whether this process is currently running with Administrator privileges. */
+internal fun isProcessElevated(): Boolean = isRunningElevated()
+
 /**
- * FastFinder always runs elevated so it can use the NTFS USN journal to catch up on filesystem
- * changes made while it was closed (see [org.example.fastfinder.index.UsnJournalReader]) -
- * opening a volume handle for that is restricted to administrators.
- *
  * Returns true if this process should continue starting the UI (it's already elevated, or
  * elevation wasn't possible and it's falling back to running without it); false if it just
  * launched an elevated relaunch of itself and this process should exit immediately instead,
@@ -24,9 +35,7 @@ private const val MAIN_CLASS = "org.example.fastfinder.MainKt"
 fun ensureElevated(args: Array<String>): Boolean {
     // Already relaunched once (or genuinely already elevated) - never try again either way,
     // so a persistent detection failure can't turn into an infinite relaunch loop.
-    if (ELEVATED_RELAUNCH_FLAG in args || isRunningElevated()) return true
-
-    explainElevationOnFirstEncounter()
+    if (isElevatedRelaunch(args) || isRunningElevated()) return true
 
     Logger.info("Not running elevated; attempting to relaunch as Administrator.")
     val relaunched = relaunchElevated()
@@ -37,19 +46,6 @@ fun ensureElevated(args: Array<String>): Boolean {
         )
     }
     return !relaunched
-}
-
-/**
- * Shows [showElevationExplanationMessage] the first time this install is ever about to trigger a
- * UAC prompt, then remembers that it did so it never shows again - synchronous plain load/save
- * rather than [AppPreferencesStore.update] since this runs in main() before Compose (and that
- * store's coroutine-mutex machinery) exists, when nothing else can be writing preferences yet.
- */
-private fun explainElevationOnFirstEncounter() {
-    val preferences = AppPreferencesStore.load()
-    if (preferences.hasSeenElevationExplanation) return
-    showElevationExplanationMessage()
-    AppPreferencesStore.save(preferences.copy(hasSeenElevationExplanation = true))
 }
 
 /** `net session` fails fast for a non-admin and succeeds for an admin - a standard, well-known Windows check. */

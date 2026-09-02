@@ -104,7 +104,8 @@ private fun IndexingNotice(modifier: Modifier = Modifier) {
             fontWeight = FontWeight.SemiBold,
         )
         Text(
-            text = "Whole-drive search results may be incomplete until indexing finishes.\nUse Custom Search to search a specific folder right now.",
+            text = "Whole-drive search results may be incomplete until indexing finishes.\n" +
+                "Use Custom Search to search a specific folder right now.",
             color = appColors.textSecondary,
             fontSize = 12.sp,
             textAlign = TextAlign.Center,

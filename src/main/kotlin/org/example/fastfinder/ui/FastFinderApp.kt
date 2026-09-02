@@ -53,7 +53,12 @@ import org.example.fastfinder.util.AppPreferencesStore
 import java.io.File
 
 @Composable
-fun FastFinderApp(dbManager: DBManager) {
+fun FastFinderApp(
+    dbManager: DBManager,
+    isElevated: Boolean,
+    isAwaitingElevation: Boolean,
+    onEnableFastSync: () -> Unit,
+) {
     val search = remember(dbManager) { Search(dbManager) }
     DisposableEffect(search) { onDispose { search.close() } }
 
@@ -169,6 +174,9 @@ fun FastFinderApp(dbManager: DBManager) {
                         }
                     },
                     onUpdateDatabase = { dbManager.createOrUpdateIndex(forceIndexCreation = true) },
+                    isElevated = isElevated,
+                    isAwaitingElevation = isAwaitingElevation,
+                    onEnableFastSync = onEnableFastSync,
                 )
 
                 Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
@@ -194,7 +202,9 @@ fun FastFinderApp(dbManager: DBManager) {
                         sizeFilter = sizeFilter,
                         sortBy = sortBy,
                         sortAscending = sortAscending,
-                        showIndexingNotice = isIndexing && searchQuery.isNotBlank() && activeCustomSearchDirectory == null,
+                        showIndexingNotice = shouldShowIndexingNotice(
+                            isIndexing, searchQuery, activeCustomSearchDirectory,
+                        ),
                         modifier = Modifier.weight(1f).fillMaxWidth(),
                     )
 
@@ -229,6 +239,18 @@ fun FastFinderApp(dbManager: DBManager) {
         }
     }
 }
+
+/**
+ * Whole-index search silently returns nothing while the index isn't ready (see
+ * Search.searchIndex), which otherwise looks identical to "no matches" - true only for a
+ * non-blank query against the whole index, since Custom Search walks the filesystem directly
+ * and is never affected by indexing state.
+ */
+private fun shouldShowIndexingNotice(
+    isIndexing: Boolean,
+    searchQuery: String,
+    activeCustomSearchDirectory: File?,
+): Boolean = isIndexing && searchQuery.isNotBlank() && activeCustomSearchDirectory == null
 
 /** Shown whenever search is scoped to a folder, so it's never a mystery why results look narrower than expected. */
 @Composable
