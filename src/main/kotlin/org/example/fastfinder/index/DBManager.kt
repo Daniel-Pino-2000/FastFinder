@@ -583,7 +583,10 @@ class DBManager(
             }
 
             if (appliedAnyChange) {
-                runCatching { currentWriter.commit() }
+                // Re-reads writer under the lock rather than committing the captured
+                // currentWriter directly - same race as processLoop's commit() above: this must
+                // not call .commit() on an IndexWriter that detach() is concurrently closing.
+                runCatching { synchronized(writerLock) { writer?.commit() } }
                     .onFailure { Logger.warn("Error committing USN journal catch-up changes: ${it.message}") }
             }
             UsnCheckpointStore.save(updatedCheckpoints, checkpointFile)
@@ -620,7 +623,12 @@ class DBManager(
             // per-class threshold for what is genuinely a one-line, single-use helper.
             fun commit() {
                 try {
-                    synchronized(writerLock) { writer }?.commit()
+                    // Holds writerLock for the whole commit() call, not just the writer read -
+                    // otherwise this can race detach() closing the same IndexWriter from another
+                    // thread mid-commit, corrupting its close protocol (Lucene throws "cannot
+                    // close: prepareCommit was already called with no corresponding call to
+                    // commit"), which leaves write.lock held and blocks the pending index rename.
+                    synchronized(writerLock) { writer?.commit() }
                 } catch (e: IOException) {
                     Logger.warn("Error committing filesystem watcher changes: ${e.message}")
                 }

@@ -194,6 +194,7 @@ fun FastFinderApp(dbManager: DBManager) {
                         sizeFilter = sizeFilter,
                         sortBy = sortBy,
                         sortAscending = sortAscending,
+                        showIndexingNotice = isIndexing && searchQuery.isNotBlank() && activeCustomSearchDirectory == null,
                         modifier = Modifier.weight(1f).fillMaxWidth(),
                     )
 

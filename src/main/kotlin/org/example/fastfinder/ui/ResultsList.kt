@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.example.fastfinder.model.SearchFilter
@@ -49,6 +50,11 @@ fun ResultsList(
     sizeFilter: SizeFilter,
     sortBy: SortBy,
     sortAscending: Boolean,
+    // Only relevant to the empty-state message below: whole-index search silently returns
+    // nothing while the index isn't ready (see Search.searchIndex), which otherwise looks
+    // identical to "no matches" - these let the empty state tell the two apart. Custom search
+    // walks the filesystem directly and isn't affected, so this never applies while it's active.
+    showIndexingNotice: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val visibleItems = remember(items, searchMode, resultFilter, sizeFilter, sortBy, sortAscending) {
@@ -67,6 +73,10 @@ fun ResultsList(
     Column(modifier = modifier) {
         ColumnHeader()
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            if (showIndexingNotice && visibleItems.isEmpty()) {
+                IndexingNotice(modifier = Modifier.align(Alignment.Center))
+            }
+
             LazyColumn(
                 state = listState,
                 contentPadding = PaddingValues(vertical = 4.dp),
@@ -80,6 +90,26 @@ fun ResultsList(
                 modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = 2.dp)
             )
         }
+    }
+}
+
+@Composable
+private fun IndexingNotice(modifier: Modifier = Modifier) {
+    val appColors = LocalAppColors.current
+    Column(modifier = modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = "Index is still being built",
+            color = appColors.textPrimary,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            text = "Whole-drive search results may be incomplete until indexing finishes.\nUse Custom Search to search a specific folder right now.",
+            color = appColors.textSecondary,
+            fontSize = 12.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 4.dp),
+        )
     }
 }
 
