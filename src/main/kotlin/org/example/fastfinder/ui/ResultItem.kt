@@ -55,6 +55,7 @@ fun ResultItem(item: SystemItem) {
     val iconTint = fileType?.let { appColors.colorFor(it) } ?: appColors.typeFolder
 
     Row(
+        verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .onPointerEvent(PointerEventType.Enter) { isHovered = true }
             .onPointerEvent(PointerEventType.Exit) { isHovered = false }
