@@ -305,8 +305,16 @@ class DBManager(
     private fun addToIndex(path: Path, indexWriter: IndexWriter, isFile: Boolean, size: Long) {
         val fullFileName = path.fileName?.toString() ?: return
         val document = Document().apply {
-            add(TextField("nameOriginal", fullFileName, Field.Store.YES))
-            add(TextField("name", fullFileName.lowercase(), Field.Store.YES))
+            // StringField, not TextField: "name" is only ever queried as a raw WildcardQuery
+            // substring match (see Search.kt), which matches against indexed *terms* - an
+            // analyzed TextField would tokenize the filename (splitting on spaces, hyphens, and
+            // - critically - the period before an extension whenever a digit or long run
+            // precedes it, e.g. "IMG_20240101_120000.jpg" -> ["img_20240101_120000", "jpg"]),
+            // so searching a complete filename would silently match nothing whenever the query
+            // spans a boundary the analyzer introduced but the original filename never had.
+            // StringField indexes the whole (already-lowercased) value as one literal token, so
+            // a wildcard substring match works for any query, extension included.
+            add(StringField("name", fullFileName.lowercase(), Field.Store.YES))
             add(StringField("parent", path.parent?.toString() ?: "", Field.Store.YES))
             add(StringField("path", path.toAbsolutePath().toString(), Field.Store.YES))
             add(StringField("isFile", isFile.toString(), Field.Store.YES))

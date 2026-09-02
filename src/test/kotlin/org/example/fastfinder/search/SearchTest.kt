@@ -8,6 +8,7 @@ import org.example.fastfinder.index.DBManager
 import org.example.fastfinder.model.SearchFilter
 import org.example.fastfinder.model.SearchMode
 import org.example.fastfinder.model.SizeFilter
+import org.example.fastfinder.model.SystemItem
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
 import java.nio.file.Files
@@ -148,6 +149,33 @@ class SearchTest {
             }
         }
         return dbManager to Search(dbManager)
+    }
+
+    @Test
+    fun `indexed search finds files by their complete name, extension included`(
+        @TempDir tempDir: Path,
+        @TempDir appDataDir: Path,
+    ) {
+        // A WildcardQuery matches against indexed *terms*, not the original string - if "name"
+        // were analyzed (tokenized) rather than indexed as one literal value, a query spanning
+        // what the analyzer treats as a word boundary would silently match nothing even though
+        // the file is right there. Confirmed (by directly inspecting StandardAnalyzer's actual
+        // token output) that this specifically bites a camera/phone photo's default name and any
+        // hyphenated name - a plain "word.ext" name happens to survive analysis as one token, so
+        // every other indexed-search test in this file (which only ever searches a short,
+        // single-word fragment of a plain name) could never have caught this either way.
+        val root = File(tempDir.toFile(), "root").apply { mkdirs() }
+        File(root, "IMG_20240101_120000.jpg").writeText("x")
+        File(root, "my-file-name.docx").writeText("x")
+
+        val (_, search) = indexedSearchOver(appDataDir, root)
+        val photoResult = search.search("IMG_20240101_120000.jpg")
+        val hyphenatedResult = search.search("my-file-name.docx")
+        search.close()
+
+        fun names(items: List<SystemItem>) = items.map { it.itemPath.substringAfterLast(File.separatorChar) }
+        assertEquals(listOf("IMG_20240101_120000.jpg"), names(photoResult))
+        assertEquals(listOf("my-file-name.docx"), names(hyphenatedResult))
     }
 
     @Test
