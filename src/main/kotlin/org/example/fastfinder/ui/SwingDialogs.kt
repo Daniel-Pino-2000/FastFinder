@@ -27,3 +27,19 @@ fun showIndexNotReadyMessage() {
         JOptionPane.INFORMATION_MESSAGE
     )
 }
+
+/**
+ * Shown when this launch loses the single-instance lock (see [org.example.fastfinder.SingleInstance])
+ * to another already-running copy, so a user who double-clicked the app again sees why nothing
+ * new opened instead of appearing to do nothing at all. The other copy may still be mid-startup
+ * (e.g. waiting on its own UAC prompt) rather than fully open yet, hence "starting or running"
+ * rather than pointing straight at the taskbar.
+ */
+fun showAlreadyRunningMessage() {
+    JOptionPane.showMessageDialog(
+        null,
+        "FastFinder is already starting or running. Check your taskbar, or the desktop for a pending Administrator prompt.",
+        "FastFinder Already Running",
+        JOptionPane.INFORMATION_MESSAGE
+    )
+}

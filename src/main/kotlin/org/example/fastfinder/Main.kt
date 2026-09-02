@@ -14,6 +14,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.example.fastfinder.index.DBManager
 import org.example.fastfinder.ui.FastFinderApp
+import org.example.fastfinder.ui.showAlreadyRunningMessage
 import org.example.fastfinder.util.AppPreferencesStore
 import org.example.fastfinder.util.Logger
 import java.awt.Dimension
@@ -24,10 +25,21 @@ private const val MIN_WINDOW_WIDTH = 800
 private const val MIN_WINDOW_HEIGHT = 600
 
 fun main(args: Array<String>) {
-    if (!ensureElevated(args)) return
-
+    // Acquired before elevation, not after: a process that hasn't elevated yet still holds this
+    // lock while its UAC prompt is up, so a near-simultaneous second launch (e.g. an impatient
+    // double-click) is turned away here instead of firing its own redundant UAC prompt. See
+    // SingleInstance's class doc for the full rationale.
     if (!SingleInstance.acquire()) {
         Logger.info("Another FastFinder instance is already running; exiting.")
+        showAlreadyRunningMessage()
+        return
+    }
+
+    if (!ensureElevated(args)) {
+        // This process only relaunched itself elevated and is about to exit - release the lock
+        // explicitly rather than waiting on process exit, so the elevated child it just spawned
+        // doesn't fail its own acquire() while this one is still shutting down.
+        SingleInstance.release()
         return
     }
 

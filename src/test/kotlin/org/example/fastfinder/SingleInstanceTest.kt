@@ -19,7 +19,7 @@ class SingleInstanceTest {
     // explicitly afterward - otherwise @TempDir can't delete the still-open lock file.
     @AfterEach
     fun releaseLock() {
-        SingleInstance.releaseForTesting()
+        SingleInstance.release()
     }
 
     @Test
@@ -41,7 +41,7 @@ class SingleInstanceTest {
         // acquires once), so this releases between the two rather than holding both at once -
         // still enough to prove acquiring one file's lock has no bearing on a different file.
         assertTrue(SingleInstance.acquire(tempDir.resolve("a.lock")))
-        SingleInstance.releaseForTesting()
+        SingleInstance.release()
         assertTrue(SingleInstance.acquire(tempDir.resolve("b.lock")))
     }
 }

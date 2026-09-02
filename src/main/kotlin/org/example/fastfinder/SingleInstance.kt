@@ -20,6 +20,12 @@ import java.nio.file.Path
  * with each other so badly that neither ever finishes at the previously-normal speed), and their
  * USN checkpoints and watchers step on each other.
  *
+ * Main.kt acquires this lock *before* attempting elevation, not after - a process that hasn't
+ * elevated yet still holds it while the UAC prompt is up, so a second, near-simultaneous launch
+ * (e.g. an impatient double-click) fails [acquire] immediately instead of firing its own
+ * redundant UAC prompt. The process that only relaunches-and-exits releases the lock explicitly
+ * right after ([release]) so the elevated child it spawned can acquire it in turn.
+ *
  * Uses an OS-level exclusive file lock rather than a "is a process with this name running"
  * check: the lock is released automatically the instant a process exits or is killed, with no
  * stale-lock file to clean up - a name/PID-based check would need to handle a leftover file from
@@ -28,9 +34,11 @@ import java.nio.file.Path
 object SingleInstance {
     private const val LOCK_FILE_NAME = "instance.lock"
 
-    // Held for the process's entire lifetime; deliberately never explicitly closed/released in
-    // production - closing it would release the lock while this process is still running. The
-    // OS releases it when the process exits, however it exits.
+    // Held for the process's entire lifetime once it's actually running the app - closing it
+    // early would release the lock while this process is still running. The OS releases it when
+    // the process exits, however it exits. The one deliberate early release is in Main.kt: a
+    // process that acquires the lock only to then relaunch itself elevated calls [release] right
+    // away so the elevated child isn't left waiting on a lock its own about-to-exit parent holds.
     private var heldChannel: FileChannel? = null
 
     /** True if this process acquired the lock (no other instance is running) and should proceed. */
@@ -63,8 +71,12 @@ object SingleInstance {
         }
     }
 
-    /** Test-only: releases whatever lock this process currently holds, so a test's @TempDir can clean up. */
-    internal fun releaseForTesting() {
+    /**
+     * Releases whatever lock this process currently holds. Used by Main.kt when this process
+     * turns out to just be relaunching itself elevated (see the class doc), and by tests so a
+     * @TempDir can clean up its lock file afterward.
+     */
+    fun release() {
         heldChannel?.close()
         heldChannel = null
     }
