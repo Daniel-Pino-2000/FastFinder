@@ -1,5 +1,6 @@
 package org.example.fastfinder.ui
 
+import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -8,12 +9,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.CircularProgressIndicator
@@ -76,21 +79,23 @@ fun FilterRail(
     val appColors = LocalAppColors.current
     val filtersEnabled = searchMode == SearchMode.FILES
 
-    Column(
+    // A single scrollable Column, deliberately with no weight()ed child anywhere in it (not even
+    // to pin the action buttons to the bottom) - weight() inside a vertically-scrolling container
+    // measures with an effectively unbounded height, and in practice that left the weighted child
+    // claiming space unpredictably and pushed the buttons after it out of the laid-out area
+    // entirely on a tall window, not just clipped but not rendered at all. Every rail section
+    // (filters, sync, actions) now just flows in sequence and the whole rail scrolls as one unit
+    // if it doesn't fit - the buttons lose their "always pinned to the bottom" polish on a tall
+    // window, but can never vanish on any window size, which matters more.
+    val scrollState = rememberScrollState()
+    Box(
         modifier = modifier
             .width(RAIL_WIDTH)
             .fillMaxHeight()
             .background(appColors.surfaceAlt),
     ) {
-        // Scrolls independently of the actions below rather than clipping/overlapping when the
-        // window is short enough that every filter section no longer fits - a fixed Column with
-        // no scroll would otherwise silently drop whatever ran past the bottom. This can't be one
-        // scrollable Column for the whole rail: a vertically-scrolling container measures its
-        // content with unbounded height, and Compose disallows a weight()ed child (which this
-        // needed, to push the actions to the bottom) inside that - so the weight instead lives on
-        // this whole scrollable region, sized by the actions section's own height below it.
         Column(
-            modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(12.dp),
+            modifier = Modifier.fillMaxSize().verticalScroll(scrollState).padding(12.dp),
         ) {
             RailSection(title = "Show") {
                 ShowSegmentedControl(searchMode, onSearchModeChange)
@@ -145,9 +150,8 @@ fun FilterRail(
             }
 
             FastSyncRow(fastSync)
-        }
+            Spacer(modifier = Modifier.height(4.dp))
 
-        Column(modifier = Modifier.padding(12.dp)) {
             RailActionButton(
                 icon = AppTheme.customSearchIcon,
                 label = "Custom Search",
@@ -169,6 +173,13 @@ fun FilterRail(
                 filled = false,
             )
         }
+
+        // Visible affordance that there's more to scroll to - without it, a short window just
+        // looks like it clipped the sync/action section, with no hint that it's reachable.
+        VerticalScrollbar(
+            adapter = rememberScrollbarAdapter(scrollState),
+            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = 2.dp),
+        )
     }
 }
 
