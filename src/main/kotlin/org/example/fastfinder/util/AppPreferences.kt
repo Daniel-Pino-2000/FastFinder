@@ -19,8 +19,13 @@ data class AppPreferences(
     val sizeFilter: SizeFilter = SizeFilter.ANY,
     val sortBy: SortBy = SortBy.NAME,
     val sortAscending: Boolean = true,
-    val windowWidth: Int = 1030,
-    val windowHeight: Int = 700,
+    // Null (rather than some fixed default like 1030x700) until the window is first resized/shown
+    // - a flat pixel default would only ever get clamped *down* to fit a small screen, never
+    // scaled to look proportionate on one, so it'd end up nearly filling a small/laptop display
+    // on first launch. Main.kt is where the actual screen-relative default gets computed, since
+    // this file has no access to the current screen's bounds.
+    val windowWidth: Int? = null,
+    val windowHeight: Int? = null,
     // Gates the one-time dialog explaining why FastFinder requests Administrator access (see
     // Elevation.kt) - read/written directly from main(), before elevation and before Compose
     // (and this store's own mutex-guarded update()) exist, so it must be a plain field here
@@ -55,8 +60,8 @@ object AppPreferencesStore {
                 sizeFilter = props.getProperty("sizeFilter").toEnumOr(SizeFilter.ANY),
                 sortBy = props.getProperty("sortBy").toEnumOr(SortBy.NAME),
                 sortAscending = props.getProperty("sortAscending").toBooleanOr(true),
-                windowWidth = props.getProperty("windowWidth")?.toIntOrNull() ?: 1030,
-                windowHeight = props.getProperty("windowHeight")?.toIntOrNull() ?: 700,
+                windowWidth = props.getProperty("windowWidth")?.toIntOrNull(),
+                windowHeight = props.getProperty("windowHeight")?.toIntOrNull(),
                 hasSeenElevationExplanation = props.getProperty("hasSeenElevationExplanation").toBooleanOr(false),
             )
         } catch (e: IOException) {
@@ -73,8 +78,11 @@ object AppPreferencesStore {
             setProperty("sizeFilter", preferences.sizeFilter.name)
             setProperty("sortBy", preferences.sortBy.name)
             setProperty("sortAscending", preferences.sortAscending.toString())
-            setProperty("windowWidth", preferences.windowWidth.toString())
-            setProperty("windowHeight", preferences.windowHeight.toString())
+            // Left unset rather than writing a placeholder if the window was never actually
+            // shown/resized yet (see the field doc) - lets load() keep telling "never set" apart
+            // from "explicitly set to some value" on the next read.
+            preferences.windowWidth?.let { setProperty("windowWidth", it.toString()) }
+            preferences.windowHeight?.let { setProperty("windowHeight", it.toString()) }
             setProperty("hasSeenElevationExplanation", preferences.hasSeenElevationExplanation.toString())
         }
         try {

@@ -24,6 +24,14 @@ private const val WINDOW_SIZE_SAVE_DEBOUNCE_MS = 500L
 private const val MIN_WINDOW_WIDTH = 800
 private const val MIN_WINDOW_HEIGHT = 600
 
+// A first-ever launch sizes the window as a fraction of the current screen instead of a flat
+// pixel default - a flat default only ever gets clamped *down* to fit a small screen (never
+// scaled to look proportionate on one), so on a common laptop display it used to read as nearly
+// full-screen despite not being maximized. These match roughly what VS Code/JetBrains IDEs open
+// at on first run: comfortably below full screen on any display, not just large ones.
+private const val DEFAULT_WINDOW_WIDTH_FRACTION = 0.7
+private const val DEFAULT_WINDOW_HEIGHT_FRACTION = 0.75
+
 fun main(args: Array<String>) {
     // Acquired before elevation, not after: a process that hasn't elevated yet still holds this
     // lock while its UAC prompt is up, so a near-simultaneous second launch (e.g. an impatient
@@ -60,8 +68,10 @@ private fun ApplicationScope.runApp() {
     // leave no way to recover short of editing the file directly.
     val screenBounds = remember { GraphicsEnvironment.getLocalGraphicsEnvironment().maximumWindowBounds }
     val windowState = rememberWindowState(
-        width = initialPreferences.windowWidth.clampToScreen(MIN_WINDOW_WIDTH, screenBounds.width).dp,
-        height = initialPreferences.windowHeight.clampToScreen(MIN_WINDOW_HEIGHT, screenBounds.height).dp,
+        width = (initialPreferences.windowWidth ?: (screenBounds.width * DEFAULT_WINDOW_WIDTH_FRACTION).toInt())
+            .clampToScreen(MIN_WINDOW_WIDTH, screenBounds.width).dp,
+        height = (initialPreferences.windowHeight ?: (screenBounds.height * DEFAULT_WINDOW_HEIGHT_FRACTION).toInt())
+            .clampToScreen(MIN_WINDOW_HEIGHT, screenBounds.height).dp,
     )
 
     LaunchedEffect(dbManager) {
