@@ -33,11 +33,13 @@ private const val WINDOW_SIZE_SAVE_DEBOUNCE_MS = 500L
 // collapsing: the 224dp filter rail plus the results table's icon/size/type/actions columns and
 // their paddings (fixed, ~324dp total) plus a still-legible floor for the weighted Name/Path
 // columns (~230dp) - go narrower than this and there's nowhere left to put Name/Path text at all.
-// The filter rail itself scrolls internally (see FilterRail) so it imposes no height minimum of
-// its own beyond its fixed bottom actions; this height instead covers the main pane needing to
-// show a few result rows, not just its header and status bar.
+// The filter rail doesn't scroll (see FilterRail's doc for why - Compose Desktop's verticalScroll
+// specifically was found, by direct testing, to trigger a measurement bug in this project's
+// Compose version when paired with a weighted sibling), so this height has to cover the rail's
+// full natural content - every filter section, the sync row, and all three action buttons, not
+// just enough for a few result rows in the main pane.
 private const val STRUCTURAL_MIN_WIDTH = 780
-private const val STRUCTURAL_MIN_HEIGHT = 520
+private const val STRUCTURAL_MIN_HEIGHT = 580
 
 // A hard floor below STRUCTURAL_MIN_WIDTH/HEIGHT, only reached on a screen too small to offer the
 // structural minimum at all (e.g. a small secondary/virtual display) - the window still needs

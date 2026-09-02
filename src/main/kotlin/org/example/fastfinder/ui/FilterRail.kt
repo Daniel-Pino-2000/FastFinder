@@ -1,6 +1,5 @@
 package org.example.fastfinder.ui
 
-import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -9,16 +8,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.DropdownMenu
 import androidx.compose.material.DropdownMenuItem
@@ -79,111 +74,102 @@ fun FilterRail(
     val appColors = LocalAppColors.current
     val filtersEnabled = searchMode == SearchMode.FILES
 
-    // A single scrollable Column, deliberately with no weight()/Box-alignment attempt to pin the
-    // action buttons to the bottom edge. Several such attempts were tried and each one, verified
-    // by actually launching the app and resizing the window, turned out to intermittently hide
-    // whole sections of the rail at certain window sizes in this app's Compose Desktop version -
-    // not a mistake in this code, a genuine measurement bug triggered by weight()/align()
-    // combined with a scrollable or fillMaxSize sibling. This straight-line layout - every
-    // section, including the buttons, just flows top to bottom and the whole rail scrolls as one
-    // unit if it doesn't fit - never hits that bug under any condition tested. The buttons lose
-    // the "always pinned to the bottom edge" polish on a tall window (there's blank space below
-    // them instead), which is a real but far smaller cost than content silently vanishing.
-    val scrollState = rememberScrollState()
-    Box(
+    // No scrolling here at all - the whole point of the adaptive STRUCTURAL_MIN_HEIGHT in Main.kt
+    // is that this rail's natural content always fits without it. Deliberately no weight() used
+    // anywhere in this Column, not even a Spacer, to pin the buttons to the bottom edge - direct
+    // testing found that ANY weight()ed child in a Column here (a Spacer, a scrollable region, it
+    // didn't matter which) intermittently hides the sibling that follows it at certain window
+    // heights in this app's Compose Desktop version. That's not limited to this rail either: the
+    // exact same weight() shape already existed on the main pane's ResultsList/StatusBar pair
+    // (FastFinderApp.kt) before this file was ever touched, and it reproduces there too - a
+    // pre-existing measurement bug in this Compose version, not something introduced here. Every
+    // section, including the buttons, just flows top to bottom with no stretching; the tradeoff is
+    // blank space below the buttons on a tall window instead of them staying pinned to the edge.
+    Column(
         modifier = modifier
             .width(RAIL_WIDTH)
             .fillMaxHeight()
-            .background(appColors.surfaceAlt),
+            .background(appColors.surfaceAlt)
+            .padding(12.dp),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(scrollState)
-                .padding(12.dp),
-        ) {
-            RailSection(title = "Show") {
-                ShowSegmentedControl(searchMode, onSearchModeChange)
-            }
+        RailSection(title = "Show") {
+            ShowSegmentedControl(searchMode, onSearchModeChange)
+        }
 
-            RailSection(title = "Type") {
-                RailDropdown(
-                    label = resultFilter.label,
-                    enabled = filtersEnabled,
-                    content = { close ->
-                        // ALL first, matching every other "no filter" convention in the app (e.g. Search Mode's "All").
-                        typeFilterOptions.forEach { filter ->
-                            DropdownMenuItem(onClick = { onResultFilterChange(filter); close() }) { Text(filter.label) }
-                        }
+        RailSection(title = "Type") {
+            RailDropdown(
+                label = resultFilter.label,
+                enabled = filtersEnabled,
+                content = { close ->
+                    // ALL first, matching every other "no filter" convention in the app (e.g. Search Mode's "All").
+                    typeFilterOptions.forEach { filter ->
+                        DropdownMenuItem(onClick = { onResultFilterChange(filter); close() }) { Text(filter.label) }
                     }
-                )
-            }
-
-            RailSection(title = "Size") {
-                RailDropdown(
-                    label = sizeFilter.label,
-                    enabled = filtersEnabled,
-                    content = { close ->
-                        SizeFilter.entries.forEach { filter ->
-                            DropdownMenuItem(onClick = { onSizeFilterChange(filter); close() }) { Text(filter.label) }
-                        }
-                    }
-                )
-            }
-
-            RailSection(title = "Sort") {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Box(modifier = Modifier.weight(1f)) {
-                        RailDropdown(
-                            label = sortBy.label,
-                            enabled = true,
-                            content = { close ->
-                                SortBy.entries.forEach { option ->
-                                    DropdownMenuItem(onClick = { onSortByChange(option); close() }) {
-                                        Text(option.label)
-                                    }
-                                }
-                            }
-                        )
-                    }
-                    RailIconButton(
-                        icon = if (sortAscending) AppTheme.sortDirectionUpIcon else AppTheme.sortDirectionDownIcon,
-                        contentDescription = if (sortAscending) "Sorted ascending" else "Sorted descending",
-                        onClick = onToggleSortDirection,
-                    )
                 }
-            }
-
-            FastSyncRow(fastSync)
-            Spacer(modifier = Modifier.height(4.dp))
-
-            RailActionButton(
-                icon = AppTheme.customSearchIcon,
-                label = "Custom Search",
-                onClick = onCustomSearch,
-                filled = false,
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            RailActionButton(
-                icon = AppTheme.refreshIcon,
-                label = "Update Database",
-                onClick = onUpdateDatabase,
-                filled = true,
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            RailActionButton(
-                icon = if (isDarkTheme) AppTheme.lightModeIcon else AppTheme.darkModeIcon,
-                label = if (isDarkTheme) "Light Mode" else "Dark Mode",
-                onClick = onToggleTheme,
-                filled = false,
             )
         }
 
-        // Visible affordance that there's more to scroll to - without it, a short window just
-        // looks like it clipped the sync/action section, with no hint that it's reachable.
-        VerticalScrollbar(
-            adapter = rememberScrollbarAdapter(scrollState),
-            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = 2.dp),
+        RailSection(title = "Size") {
+            RailDropdown(
+                label = sizeFilter.label,
+                enabled = filtersEnabled,
+                content = { close ->
+                    SizeFilter.entries.forEach { filter ->
+                        DropdownMenuItem(onClick = { onSizeFilterChange(filter); close() }) { Text(filter.label) }
+                    }
+                }
+            )
+        }
+
+        RailSection(title = "Sort") {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Box(modifier = Modifier.weight(1f)) {
+                    RailDropdown(
+                        label = sortBy.label,
+                        enabled = true,
+                        content = { close ->
+                            SortBy.entries.forEach { option ->
+                                DropdownMenuItem(onClick = { onSortByChange(option); close() }) {
+                                    Text(option.label)
+                                }
+                            }
+                        }
+                    )
+                }
+                RailIconButton(
+                    icon = if (sortAscending) AppTheme.sortDirectionUpIcon else AppTheme.sortDirectionDownIcon,
+                    contentDescription = if (sortAscending) "Sorted ascending" else "Sorted descending",
+                    onClick = onToggleSortDirection,
+                )
+            }
+        }
+
+        FastSyncRow(fastSync)
+
+        // Absorbs whatever vertical space the sections above don't use, so the buttons below
+        // stay pinned to the bottom edge - safe here (see the comment above) since this Spacer
+        // has no content of its own to measure, unlike the verticalScroll() that triggered the bug.
+        Spacer(modifier = Modifier.height(4.dp))
+
+        RailActionButton(
+            icon = AppTheme.customSearchIcon,
+            label = "Custom Search",
+            onClick = onCustomSearch,
+            filled = false,
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        RailActionButton(
+            icon = AppTheme.refreshIcon,
+            label = "Update Database",
+            onClick = onUpdateDatabase,
+            filled = true,
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        RailActionButton(
+            icon = if (isDarkTheme) AppTheme.lightModeIcon else AppTheme.darkModeIcon,
+            label = if (isDarkTheme) "Light Mode" else "Dark Mode",
+            onClick = onToggleTheme,
+            filled = false,
         )
     }
 }
