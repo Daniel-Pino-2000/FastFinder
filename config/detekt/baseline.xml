@@ -16,7 +16,7 @@
     <ID>FunctionNaming:FilterRail.kt$@Composable private fun RailIconButton(icon: ImageVector, contentDescription: String, onClick: () -&gt; Unit)</ID>
     <ID>FunctionNaming:FilterRail.kt$@Composable private fun RailSection(title: String, content: @Composable () -&gt; Unit)</ID>
     <ID>FunctionNaming:FilterRail.kt$@Composable private fun ShowSegmentedControl(selected: SearchMode, onSelect: (SearchMode) -&gt; Unit)</ID>
-    <ID>FunctionNaming:ResultItem.kt$@OptIn(ExperimentalComposeUiApi::class) @Composable private fun RowActionIcon(icon: ImageVector, contentDescription: String, onClick: () -&gt; Unit)</ID>
+    <ID>FunctionNaming:ResultItem.kt$@OptIn(ExperimentalComposeUiApi::class) @Composable private fun RowActionIcon(icon: ImageVector, contentDescription: String, visible: Boolean, onClick: () -&gt; Unit)</ID>
     <ID>FunctionNaming:ResultItem.kt$@OptIn(ExperimentalComposeUiApi::class, ExperimentalFoundationApi::class) @Composable fun ResultItem(item: SystemItem)</ID>
     <ID>FunctionNaming:ResultsList.kt$@Composable fun ResultsList( items: List&lt;SystemItem&gt;, searchMode: SearchMode, resultFilter: SearchFilter, sizeFilter: SizeFilter, sortBy: SortBy, sortAscending: Boolean, // Only relevant to the empty-state message below: whole-index search silently returns // nothing while the index isn't ready (see Search.searchIndex), which otherwise looks // identical to "no matches" - these let the empty state tell the two apart. Custom search // walks the filesystem directly and isn't affected, so this never applies while it's active. showIndexingNotice: Boolean = false, modifier: Modifier = Modifier, )</ID>
     <ID>FunctionNaming:ResultsList.kt$@Composable private fun ColumnHeader()</ID>

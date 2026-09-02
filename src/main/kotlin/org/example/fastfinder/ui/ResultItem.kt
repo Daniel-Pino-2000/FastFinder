@@ -105,19 +105,25 @@ fun ResultItem(item: SystemItem) {
             modifier = Modifier.width(TYPE_COLUMN_WIDTH).padding(start = 8.dp),
         )
 
+        // Both icons are always emitted (never conditionally, just made invisible/inert via
+        // RowActionIcon's own `visible` flag) so this Row's height - and with it the whole row's
+        // height, since Row sizes itself to its tallest child - never changes between hovered and
+        // not. It used to only emit them while isHovered, which made the actions column taller
+        // than empty space the instant the mouse entered, growing the row and re-centering every
+        // other column's already-centered content right under the cursor.
         Row(modifier = Modifier.width(ACTIONS_COLUMN_WIDTH), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            if (isHovered) {
-                RowActionIcon(
-                    icon = AppTheme.copyIcon,
-                    contentDescription = "Copy path",
-                    onClick = { copyPathToClipboard(item.itemPath) },
-                )
-                RowActionIcon(
-                    icon = AppTheme.openFolderIcon,
-                    contentDescription = "Open containing folder",
-                    onClick = { openContainingFolder(item.itemPath) },
-                )
-            }
+            RowActionIcon(
+                icon = AppTheme.copyIcon,
+                contentDescription = "Copy path",
+                visible = isHovered,
+                onClick = { copyPathToClipboard(item.itemPath) },
+            )
+            RowActionIcon(
+                icon = AppTheme.openFolderIcon,
+                contentDescription = "Open containing folder",
+                visible = isHovered,
+                onClick = { openContainingFolder(item.itemPath) },
+            )
         }
     }
 }
@@ -125,10 +131,15 @@ fun ResultItem(item: SystemItem) {
 /**
  * A per-row hover action icon - sized well past its 14dp glyph (28dp clickable box, with its own
  * hover highlight) since the glyph alone was too small a target to click reliably.
+ *
+ * Always occupies its 28dp box regardless of [visible] - only its own contents (icon, background,
+ * click handling) are conditional - so the row it sits in never resizes depending on whether it's
+ * shown, which is the whole point of [visible] existing instead of the caller simply not emitting
+ * this composable at all while hidden.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-private fun RowActionIcon(icon: ImageVector, contentDescription: String, onClick: () -> Unit) {
+private fun RowActionIcon(icon: ImageVector, contentDescription: String, visible: Boolean, onClick: () -> Unit) {
     var isHovered by remember { mutableStateOf(false) }
     val appColors = LocalAppColors.current
 
@@ -140,16 +151,18 @@ private fun RowActionIcon(icon: ImageVector, contentDescription: String, onClick
             .background(if (isHovered) appColors.background else Color.Transparent)
             .onPointerEvent(PointerEventType.Enter) { isHovered = true }
             .onPointerEvent(PointerEventType.Exit) { isHovered = false }
-            .clickable(onClick = onClick)
+            .then(if (visible) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(5.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            icon,
-            contentDescription = contentDescription,
-            tint = appColors.textSecondary,
-            modifier = Modifier.width(16.dp),
-        )
+        if (visible) {
+            Icon(
+                icon,
+                contentDescription = contentDescription,
+                tint = appColors.textSecondary,
+                modifier = Modifier.width(16.dp),
+            )
+        }
     }
 }
 

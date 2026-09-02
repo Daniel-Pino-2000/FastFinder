@@ -296,7 +296,10 @@ private fun RailActionButton(icon: ImageVector, label: String, onClick: () -> Un
             )
             .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 9.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        // Centered, not left-aligned: fillMaxWidth() gives this Row the whole rail's width, but
+        // the icon+label pair is nowhere near that wide, so left-aligning it (spacedBy's default)
+        // left a large dead gap on the right and read as off-center.
+        horizontalArrangement = Arrangement.spacedBy(8.dp, alignment = Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
