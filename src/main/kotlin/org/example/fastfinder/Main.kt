@@ -28,8 +28,23 @@ import java.awt.Dimension
 import java.awt.GraphicsEnvironment
 
 private const val WINDOW_SIZE_SAVE_DEBOUNCE_MS = 500L
-private const val MIN_WINDOW_WIDTH = 800
-private const val MIN_WINDOW_HEIGHT = 600
+
+// The smallest size the fixed parts of the layout actually need to render without clipping or
+// collapsing: the 224dp filter rail plus the results table's icon/size/type/actions columns and
+// their paddings (fixed, ~324dp total) plus a still-legible floor for the weighted Name/Path
+// columns (~230dp) - go narrower than this and there's nowhere left to put Name/Path text at all.
+// The filter rail itself scrolls internally (see FilterRail) so it imposes no height minimum of
+// its own beyond its fixed bottom actions; this height instead covers the main pane needing to
+// show a few result rows, not just its header and status bar.
+private const val STRUCTURAL_MIN_WIDTH = 780
+private const val STRUCTURAL_MIN_HEIGHT = 520
+
+// A hard floor below STRUCTURAL_MIN_WIDTH/HEIGHT, only reached on a screen too small to offer the
+// structural minimum at all (e.g. a small secondary/virtual display) - the window still needs
+// *some* usable size rather than being forced larger than the screen itself, even though content
+// will then need scrolling to fit.
+private const val ABSOLUTE_FLOOR_WIDTH = 480
+private const val ABSOLUTE_FLOOR_HEIGHT = 360
 
 // A first-ever launch sizes the window as a fraction of the current screen instead of a flat
 // pixel default - a flat default only ever gets clamped *down* to fit a small screen (never
@@ -138,12 +153,21 @@ private fun ApplicationScope.runApp(args: Array<String>) {
     }
 
     val screenBounds = remember { GraphicsEnvironment.getLocalGraphicsEnvironment().maximumWindowBounds }
+    // Adapts to the current screen rather than a flat constant: normally the structural minimum
+    // the layout needs, but never forced larger than the screen itself has room for - see
+    // STRUCTURAL_MIN_WIDTH/HEIGHT's doc.
+    val minWidth = remember(screenBounds) {
+        STRUCTURAL_MIN_WIDTH.coerceAtMost(screenBounds.width).coerceAtLeast(ABSOLUTE_FLOOR_WIDTH)
+    }
+    val minHeight = remember(screenBounds) {
+        STRUCTURAL_MIN_HEIGHT.coerceAtMost(screenBounds.height).coerceAtLeast(ABSOLUTE_FLOOR_HEIGHT)
+    }
     val windowState = rememberWindowState(
         width = resolveWindowDimension(
-            initialPreferences.windowWidth, MIN_WINDOW_WIDTH, screenBounds.width, DEFAULT_WINDOW_WIDTH_FRACTION,
+            initialPreferences.windowWidth, minWidth, screenBounds.width, DEFAULT_WINDOW_WIDTH_FRACTION,
         ).dp,
         height = resolveWindowDimension(
-            initialPreferences.windowHeight, MIN_WINDOW_HEIGHT, screenBounds.height, DEFAULT_WINDOW_HEIGHT_FRACTION,
+            initialPreferences.windowHeight, minHeight, screenBounds.height, DEFAULT_WINDOW_HEIGHT_FRACTION,
         ).dp,
     )
 
@@ -175,7 +199,7 @@ private fun ApplicationScope.runApp(args: Array<String>) {
         title = "FastFinder",
         state = windowState,
     ) {
-        window.minimumSize = Dimension(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT)
+        window.minimumSize = Dimension(minWidth, minHeight)
         FastFinderApp(
             dbManager = dbManager,
             fastSync = FastSyncState(

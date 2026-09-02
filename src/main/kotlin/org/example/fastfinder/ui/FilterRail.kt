@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.DropdownMenu
 import androidx.compose.material.DropdownMenuItem
@@ -78,84 +80,95 @@ fun FilterRail(
         modifier = modifier
             .width(RAIL_WIDTH)
             .fillMaxHeight()
-            .background(appColors.surfaceAlt)
-            .padding(12.dp),
+            .background(appColors.surfaceAlt),
     ) {
-        RailSection(title = "Show") {
-            ShowSegmentedControl(searchMode, onSearchModeChange)
-        }
+        // Scrolls independently of the actions below rather than clipping/overlapping when the
+        // window is short enough that every filter section no longer fits - a fixed Column with
+        // no scroll would otherwise silently drop whatever ran past the bottom. This can't be one
+        // scrollable Column for the whole rail: a vertically-scrolling container measures its
+        // content with unbounded height, and Compose disallows a weight()ed child (which this
+        // needed, to push the actions to the bottom) inside that - so the weight instead lives on
+        // this whole scrollable region, sized by the actions section's own height below it.
+        Column(
+            modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(12.dp),
+        ) {
+            RailSection(title = "Show") {
+                ShowSegmentedControl(searchMode, onSearchModeChange)
+            }
 
-        RailSection(title = "Type") {
-            RailDropdown(
-                label = resultFilter.label,
-                enabled = filtersEnabled,
-                content = { close ->
-                    // ALL first, matching every other "no filter" convention in the app (e.g. Search Mode's "All").
-                    typeFilterOptions.forEach { filter ->
-                        DropdownMenuItem(onClick = { onResultFilterChange(filter); close() }) { Text(filter.label) }
-                    }
-                }
-            )
-        }
-
-        RailSection(title = "Size") {
-            RailDropdown(
-                label = sizeFilter.label,
-                enabled = filtersEnabled,
-                content = { close ->
-                    SizeFilter.entries.forEach { filter ->
-                        DropdownMenuItem(onClick = { onSizeFilterChange(filter); close() }) { Text(filter.label) }
-                    }
-                }
-            )
-        }
-
-        RailSection(title = "Sort") {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Box(modifier = Modifier.weight(1f)) {
-                    RailDropdown(
-                        label = sortBy.label,
-                        enabled = true,
-                        content = { close ->
-                            SortBy.entries.forEach { option ->
-                                DropdownMenuItem(onClick = { onSortByChange(option); close() }) { Text(option.label) }
-                            }
+            RailSection(title = "Type") {
+                RailDropdown(
+                    label = resultFilter.label,
+                    enabled = filtersEnabled,
+                    content = { close ->
+                        // ALL first, matching every other "no filter" convention in the app (e.g. Search Mode's "All").
+                        typeFilterOptions.forEach { filter ->
+                            DropdownMenuItem(onClick = { onResultFilterChange(filter); close() }) { Text(filter.label) }
                         }
-                    )
-                }
-                RailIconButton(
-                    icon = if (sortAscending) AppTheme.sortDirectionUpIcon else AppTheme.sortDirectionDownIcon,
-                    contentDescription = if (sortAscending) "Sorted ascending" else "Sorted descending",
-                    onClick = onToggleSortDirection,
+                    }
                 )
             }
+
+            RailSection(title = "Size") {
+                RailDropdown(
+                    label = sizeFilter.label,
+                    enabled = filtersEnabled,
+                    content = { close ->
+                        SizeFilter.entries.forEach { filter ->
+                            DropdownMenuItem(onClick = { onSizeFilterChange(filter); close() }) { Text(filter.label) }
+                        }
+                    }
+                )
+            }
+
+            RailSection(title = "Sort") {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        RailDropdown(
+                            label = sortBy.label,
+                            enabled = true,
+                            content = { close ->
+                                SortBy.entries.forEach { option ->
+                                    DropdownMenuItem(onClick = { onSortByChange(option); close() }) {
+                                        Text(option.label)
+                                    }
+                                }
+                            }
+                        )
+                    }
+                    RailIconButton(
+                        icon = if (sortAscending) AppTheme.sortDirectionUpIcon else AppTheme.sortDirectionDownIcon,
+                        contentDescription = if (sortAscending) "Sorted ascending" else "Sorted descending",
+                        onClick = onToggleSortDirection,
+                    )
+                }
+            }
+
+            FastSyncRow(fastSync)
         }
 
-        Spacer(modifier = Modifier.weight(1f))
-
-        FastSyncRow(fastSync)
-        Spacer(modifier = Modifier.height(10.dp))
-
-        RailActionButton(
-            icon = AppTheme.customSearchIcon,
-            label = "Custom Search",
-            onClick = onCustomSearch,
-            filled = false,
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        RailActionButton(
-            icon = AppTheme.refreshIcon,
-            label = "Update Database",
-            onClick = onUpdateDatabase,
-            filled = true,
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        RailActionButton(
-            icon = if (isDarkTheme) AppTheme.lightModeIcon else AppTheme.darkModeIcon,
-            label = if (isDarkTheme) "Light Mode" else "Dark Mode",
-            onClick = onToggleTheme,
-            filled = false,
-        )
+        Column(modifier = Modifier.padding(12.dp)) {
+            RailActionButton(
+                icon = AppTheme.customSearchIcon,
+                label = "Custom Search",
+                onClick = onCustomSearch,
+                filled = false,
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            RailActionButton(
+                icon = AppTheme.refreshIcon,
+                label = "Update Database",
+                onClick = onUpdateDatabase,
+                filled = true,
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            RailActionButton(
+                icon = if (isDarkTheme) AppTheme.lightModeIcon else AppTheme.darkModeIcon,
+                label = if (isDarkTheme) "Light Mode" else "Dark Mode",
+                onClick = onToggleTheme,
+                filled = false,
+            )
+        }
     }
 }
 
