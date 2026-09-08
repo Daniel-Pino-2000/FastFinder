@@ -13,6 +13,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.unit.dp
 import org.example.fastfinder.ui.theme.LocalAppColors
@@ -24,6 +26,7 @@ fun SearchBar(
     onSearchQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
     modifier: Modifier = Modifier,
+    focusRequester: FocusRequester? = null,
 ) {
     val appColors = LocalAppColors.current
 
@@ -41,6 +44,7 @@ fun SearchBar(
             trailingIcon = { ClearSearchButton(searchQuery, onSearchQueryChange) },
             modifier = Modifier
                 .weight(1f)
+                .let { if (focusRequester != null) it.focusRequester(focusRequester) else it }
                 .onKeyEvent { event ->
                     if (event.type == KeyEventType.KeyUp && event.key == Key.Enter) {
                         onSearch()

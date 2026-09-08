@@ -28,6 +28,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -79,17 +80,11 @@ fun FastFinderApp(dbManager: DBManager, fastSync: FastSyncState) {
     var sortAscending by remember { mutableStateOf(initialPreferences.sortAscending) }
     var results by remember { mutableStateOf(emptyList<SystemItem>()) }
 
-    var showCustomSearchDialog by remember { mutableStateOf(false) }
-    var customSearchDirectory by remember { mutableStateOf<File?>(null) }
-    // The dialog's own draft query - kept separate from searchQuery so typing into the dialog
-    // doesn't also feed the main search bar underneath it and fire a live search behind the
-    // modal. Only copied into searchQuery once the user confirms.
-    var customSearchQuery by remember { mutableStateOf("") }
-    // The folder a confirmed custom search is currently scoped to - distinct from
-    // customSearchDirectory (which is just whatever the picker last chose, valid only while the
-    // dialog above is open). This one persists after the dialog closes so live search-as-you-type
-    // keeps searching that folder instead of silently falling back to the full index.
+    // The folder the current custom search is scoped to. Set as soon as the picker returns a
+    // folder - there's no separate confirmation step, so live search-as-you-type in the regular
+    // search bar starts searching that folder immediately.
     var activeCustomSearchDirectory by remember { mutableStateOf<File?>(null) }
+    val searchBarFocusRequester = remember { FocusRequester() }
     var isDarkTheme by remember { mutableStateOf(initialPreferences.darkTheme) }
 
     // Persists theme/filter/sort choices across restarts. Reads the current file before
@@ -174,9 +169,8 @@ fun FastFinderApp(dbManager: DBManager, fastSync: FastSyncState) {
                         coroutineScope.launch {
                             val directory = withContext(Dispatchers.IO) { showDirectoryPicker() }
                             if (directory != null) {
-                                customSearchDirectory = directory
-                                customSearchQuery = searchQuery
-                                showCustomSearchDialog = true
+                                activeCustomSearchDirectory = directory
+                                searchBarFocusRequester.requestFocus()
                             }
                         }
                     },
@@ -193,6 +187,7 @@ fun FastFinderApp(dbManager: DBManager, fastSync: FastSyncState) {
                         searchQuery = searchQuery,
                         onSearchQueryChange = { searchQuery = it },
                         onSearch = { runSearch(activeCustomSearchDirectory) },
+                        focusRequester = searchBarFocusRequester,
                         modifier = Modifier.padding(12.dp),
                     )
 
@@ -217,27 +212,6 @@ fun FastFinderApp(dbManager: DBManager, fastSync: FastSyncState) {
                         isIndexing = isIndexing,
                         indexedCount = indexedCount,
                         resultCount = results.size,
-                    )
-                }
-            }
-
-            if (showCustomSearchDialog) {
-                customSearchDirectory?.let { directory ->
-                    CustomSearchDialog(
-                        directory = directory,
-                        query = customSearchQuery,
-                        onQueryChange = { customSearchQuery = it },
-                        onConfirm = {
-                            showCustomSearchDialog = false
-                            // Setting these two - not calling runSearch directly - is deliberate:
-                            // both are keys of the live-search LaunchedEffect below, so changing
-                            // them already triggers a search. A direct runSearch call here used to
-                            // race that effect restart (which always cancels the in-flight job
-                            // first) and lose, silently re-querying after another 250ms for nothing.
-                            searchQuery = customSearchQuery
-                            activeCustomSearchDirectory = directory
-                        },
-                        onDismiss = { showCustomSearchDialog = false }
                     )
                 }
             }
