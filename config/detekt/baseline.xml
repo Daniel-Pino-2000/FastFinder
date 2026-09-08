@@ -6,6 +6,7 @@
     <ID>CyclomaticComplexMethod:Search.kt$Search$private fun searchIndex(query: String, searchMode: SearchMode, resultFilter: SearchFilter, sizeFilter: SizeFilter): List&lt;SystemItem&gt;</ID>
     <ID>ExplicitGarbageCollectionCall:DBManager.kt$DBManager$gc()</ID>
     <ID>FunctionNaming:CustomSearchDialog.kt$@Composable fun CustomSearchDialog( directory: File, query: String, onQueryChange: (String) -&gt; Unit, onConfirm: () -&gt; Unit, onDismiss: () -&gt; Unit, )</ID>
+    <ID>FunctionNaming:CustomSearchDialog.kt$@Composable private fun DialogButton(text: String, filled: Boolean, onClick: () -&gt; Unit)</ID>
     <ID>FunctionNaming:ErrorBanner.kt$@Composable fun ErrorBanner(message: String, onDismiss: () -&gt; Unit)</ID>
     <ID>FunctionNaming:FastFinderApp.kt$@Composable fun FastFinderApp(dbManager: DBManager, fastSync: FastSyncState)</ID>
     <ID>FunctionNaming:FastFinderApp.kt$@Composable private fun CustomSearchIndicator(directory: File, onClear: () -&gt; Unit)</ID>
