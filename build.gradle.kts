@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "org.example"
-version = "1.0.6"
+version = "1.0.7"
 
 // Pins the JDK actually used to compile/run this build to 21, independent of whatever JDK
 // happens to be selected as the IDE's Project SDK - without this, pointing the IDE at a newer
