@@ -63,7 +63,10 @@ compose.desktop {
             // handling, elevation, the NTFS USN journal) - Dmg/Deb would be dead config at best.
             targetFormats(TargetFormat.Msi)
             packageName = "FastFinder"
-            packageVersion = "1.0.0"
+            // Reads from the project version above instead of its own literal, so a release
+            // only ever needs bumping in one place - the two used to drift by being separate
+            // hardcoded strings.
+            packageVersion = project.version.toString()
             description = "Instant, filterable full-text search over local files and folders."
             vendor = "Daniel Pino"
 
@@ -73,6 +76,7 @@ compose.desktop {
                 // version ships without a pinned value here, it can't be safely added
                 // retroactively - each build would otherwise get its own random one.
                 upgradeUuid = "27C964BF-314F-4620-AF24-9A1C863CF536"
+                iconFile.set(project.file("icons/app.ico"))
             }
         }
     }

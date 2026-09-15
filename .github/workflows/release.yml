@@ -1,0 +1,51 @@
+name: Release
+
+# Builds the Windows installer and attaches it to a GitHub Release whenever a version tag
+# (e.g. v1.0.0) is pushed - the only distribution path for non-developers otherwise being
+# "clone the repo and build it yourself".
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build the Windows installer
+        run: ./gradlew.bat packageMsi --console=plain
+
+      - name: Locate the built MSI
+        id: msi
+        shell: pwsh
+        run: |
+          $msi = Get-ChildItem -Path build/compose/binaries/main/msi -Filter *.msi | Select-Object -First 1
+          "path=$($msi.FullName)" >> $env:GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.msi.outputs.path }}
+          # The installer isn't code-signed, so Windows SmartScreen shows an "Unknown
+          # publisher" warning on first run - expected without a paid signing certificate,
+          # worth calling out on the release itself rather than leaving users to wonder.
+          body: |
+            Windows installer for this release. Since it isn't code-signed, SmartScreen may
+            show an "Unknown publisher" warning on install - click "More info" > "Run anyway"
+            to proceed.
+          generate_release_notes: true

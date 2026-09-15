@@ -11,15 +11,26 @@ Compose Desktop, and Apache Lucene.
 
 ## Contents
 
-1. [Features](#features)
-2. [Architecture](#architecture)
-3. [Building and running](#building-and-running)
-4. [Testing and static analysis](#testing-and-static-analysis)
-5. [Performance](#performance)
-6. [Screenshots](#screenshots)
-7. [About the Developer](#about-the-developer)
+1. [Installing](#installing)
+2. [Features](#features)
+3. [Architecture](#architecture)
+4. [Building and running](#building-and-running)
+5. [Testing and static analysis](#testing-and-static-analysis)
+6. [Performance](#performance)
+7. [Screenshots](#screenshots)
+8. [About the Developer](#about-the-developer)
 
 ---
+
+## Installing
+
+Download the latest `FastFinder-x.y.z.msi` from the
+[Releases page](https://github.com/Daniel-Pino-2000/FastFinder/releases) and run it. Windows
+is the only supported platform.
+
+The installer isn't code-signed, so SmartScreen will likely show an "Unknown publisher"
+warning the first time you run it - click **More info > Run anyway** to proceed. This is
+expected for a project without a paid code-signing certificate, not a sign anything's wrong.
 
 ## Features
 

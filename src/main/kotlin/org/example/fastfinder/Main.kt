@@ -8,6 +8,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.res.loadImageBitmap
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Window
@@ -206,10 +208,13 @@ private fun ApplicationScope.runApp(args: Array<String>) {
         }
     }
 
+    val windowIcon = remember { loadWindowIcon() }
+
     Window(
         onCloseRequest = ::exitApplication,
         title = "FastFinder",
         state = windowState,
+        icon = windowIcon,
     ) {
         window.minimumSize = Dimension(minWidth, minHeight)
         FastFinderApp(
@@ -224,6 +229,16 @@ private fun ApplicationScope.runApp(args: Array<String>) {
         )
     }
 }
+
+/**
+ * Loaded from the plain classpath resource rather than the newer Compose Multiplatform resource
+ * system (unused elsewhere in this single-module app) - just a raw PNG under src/main/resources,
+ * read once per process lifetime. Best-effort: a missing/unreadable resource just leaves the
+ * window on the JVM's default icon rather than failing startup.
+ */
+private fun loadWindowIcon(): BitmapPainter? = runCatching {
+    object {}.javaClass.getResourceAsStream("/icon.png")?.use { BitmapPainter(loadImageBitmap(it)) }
+}.getOrNull()
 
 /**
  * A persisted window dimension is honored as-is only if it still fits this screen
