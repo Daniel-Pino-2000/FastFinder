@@ -195,7 +195,11 @@ internal fun copyPathToClipboard(path: String) {
 private fun openContainingFolder(path: String) {
     val parent = File(path).parentFile
     if (parent != null && parent.exists()) {
-        runCatching { Desktop.getDesktop().browse(parent.toURI()) }
+        // open(File), not browse(URI) - browse() specifically launches the default *web browser*
+        // (it's meant for http/https links), so a file:// URI there opened the browser instead of
+        // Explorer. open() dispatches to whatever's actually associated with a directory, which is
+        // Explorer, matching openItem()'s already-correct handling of directories below.
+        runCatching { Desktop.getDesktop().open(parent) }
             .onFailure { Logger.warn("Could not open containing folder for $path: ${it.message}") }
     }
 }
