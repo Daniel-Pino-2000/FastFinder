@@ -104,6 +104,16 @@ compose.desktop {
             description = "Instant, filterable full-text search over local files and folders."
             vendor = "Daniel Pino"
 
+            // The bundled installer's runtime is a custom, stripped-down JVM image (via jlink),
+            // built from the modules Compose Desktop's dependency scan detects as needed - which
+            // missed jdk.unsupported, where com.sun.nio.file.ExtendedWatchEventModifier
+            // (DBManager's live filesystem watcher) actually lives. That module's absence only
+            // ever breaks the *installed* app (java.lang.NoClassDefFoundError on launch) -
+            // `./gradlew run` always uses the full system JDK, which has every module, so this
+            // never showed up there. Listed explicitly so jlink always includes it regardless of
+            // whether auto-detection catches this particular usage.
+            modules("jdk.unsupported")
+
             windows {
                 // Fixed for the life of the app: WiX uses this to recognize a new installer as an
                 // upgrade of an existing install rather than a separate side-by-side one. Once a
@@ -111,6 +121,13 @@ compose.desktop {
                 // retroactively - each build would otherwise get its own random one.
                 upgradeUuid = "27C964BF-314F-4620-AF24-9A1C863CF536"
                 iconFile.set(project.file("icons/app.ico"))
+                // Off by default in jpackage/Compose Desktop - without these the installer runs
+                // to completion having copied the app's files somewhere, but leaves no Start
+                // Menu entry, no desktop icon, and nothing that launches it, so it looks like
+                // installing did nothing at all.
+                menu = true
+                menuGroup = "FastFinder"
+                shortcut = true
             }
         }
     }
