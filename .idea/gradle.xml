@@ -4,6 +4,14 @@
   <component name="GradleSettings">
     <option name="linkedExternalProjectsSettings">
       <GradleProjectSettings>
+        <!-- Makes the IDE's Run button and Build actions always go through Gradle (and
+             therefore always honor build.gradle.kts's jvmToolchain(21)) instead of IntelliJ's
+             own native builder/launcher, which uses whatever the Project SDK dropdown happens
+             to be set to. Without this, a Project SDK older than 21 (e.g. jbr-17) launches
+             already-Gradle-compiled JDK-21-targeted classes and fails with "LinkageError...
+             UnsupportedClassVersionError" - the class files require a newer runtime than the
+             one actually starting the JVM. -->
+        <option name="delegatedBuild" value="true" />
         <option name="externalProjectPath" value="$PROJECT_DIR$" />
         <option name="modules">
           <set>
