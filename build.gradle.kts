@@ -1,3 +1,4 @@
+import org.gradle.jvm.toolchain.JavaLanguageVersion
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 plugins {
@@ -19,6 +20,28 @@ version = "1.0.0"
 // this doesn't auto-download one.
 kotlin {
     jvmToolchain(21)
+}
+
+// jvmToolchain above only pins what compiles the code - a JavaExec task (Compose Desktop's own
+// `run`, and benchmarkIndexing below) otherwise executes using whichever JVM happens to be
+// running the Gradle daemon itself, which is a *different* JVM selection entirely (IntelliJ's
+// "Gradle JVM" setting, often left as "Project SDK"). A daemon running under an older JVM (e.g.
+// JBR 17) then tries to run these JDK-21-targeted class files and fails with "LinkageError...
+// UnsupportedClassVersionError" even though compilation itself succeeded. Forcing every
+// JavaExec's launcher through the toolchain service closes that gap: whatever JVM the daemon
+// itself runs under, the actual `java` process these tasks launch is always JDK 21.
+//
+// Wrapped in afterEvaluate and set on `executable` (not `javaLauncher` - conflicts with it:
+// "Toolchain from `executable` property does not match toolchain from `javaLauncher` property")
+// because the Compose Desktop plugin configures the `run` task's `executable` itself, in its own
+// afterEvaluate registered when the plugin is applied (before this script's body runs) - setting
+// this eagerly here gets silently clobbered by that later. A script-level afterEvaluate runs
+// after ones registered during plugin application, so this one wins instead.
+afterEvaluate {
+    tasks.withType<JavaExec>().configureEach {
+        executable = javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(21)) }
+            .get().executablePath.asFile.absolutePath
+    }
 }
 
 repositories {
