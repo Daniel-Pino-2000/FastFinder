@@ -46,6 +46,11 @@ expected for a project without a paid code-signing certificate, not a sign anyth
   usable even while the background index is being (re)built.
 - **Live re-indexing** with progress reporting, without blocking search against the previous
   index while it runs.
+- **Fast Update Tracking** (opt-in, via a settings toggle) - reads the NTFS USN Journal to catch
+  up on filesystem changes made while the app was closed instantly, instead of a full rescan.
+  Opening a volume handle for that is restricted to administrators, so enabling it relaunches
+  the app elevated; it stays off by default so a first launch never triggers an unexplained UAC
+  prompt.
 - Light/dark theme.
 
 ## Architecture
