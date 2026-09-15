@@ -5,6 +5,7 @@ import org.apache.lucene.index.IndexWriter
 import org.apache.lucene.index.IndexWriterConfig
 import org.apache.lucene.store.FSDirectory
 import org.example.fastfinder.index.DBManager
+import org.example.fastfinder.index.INDEX_SCHEMA_VERSION
 import org.example.fastfinder.model.SearchFilter
 import org.example.fastfinder.model.SearchMode
 import org.example.fastfinder.model.SizeFilter
@@ -169,7 +170,7 @@ class SearchTest {
     private fun indexedSearchOver(baseDir: Path, root: File): Pair<DBManager, Search> {
         val indexDir = baseDir.resolve("test-index")
         Files.createDirectories(indexDir)
-        Files.write(indexDir.resolve("index_state.txt"), listOf("false"))
+        Files.write(indexDir.resolve("index_state.txt"), listOf("false", INDEX_SCHEMA_VERSION.toString()))
 
         val dbManager = DBManager(indexDirectoryName = "test-index", baseDirectory = baseDir)
         FSDirectory.open(dbManager.indexPath).use { directory ->
@@ -267,7 +268,7 @@ class SearchTest {
 
         val indexDir = appDataDir.resolve("test-index")
         Files.createDirectories(indexDir)
-        Files.write(indexDir.resolve("index_state.txt"), listOf("false"))
+        Files.write(indexDir.resolve("index_state.txt"), listOf("false", INDEX_SCHEMA_VERSION.toString()))
         val dbManager = DBManager(indexDirectoryName = "test-index", baseDirectory = appDataDir)
         FSDirectory.open(dbManager.indexPath).use { directory ->
             IndexWriter(directory, IndexWriterConfig(StandardAnalyzer())).use { writer ->

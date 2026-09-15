@@ -55,6 +55,15 @@ private const val WATCHER_SHUTDOWN_TIMEOUT_MS = 2000L
 private const val USN_CHECKPOINTS_FILE_NAME = "usn_checkpoints.properties"
 
 /**
+ * Bump this whenever a field is added to (or changed in) the Lucene document schema built by
+ * [DBManager.addToIndex]. A mismatch against the version last written to the state file forces a
+ * full rebuild on next launch instead of silently reusing an on-disk index that's missing the new
+ * field - e.g. the "modified" field added for date sorting would otherwise stay unset for every
+ * item indexed before the upgrade, since normal startup only rebuilds when there's no index yet.
+ */
+internal const val INDEX_SCHEMA_VERSION = 2
+
+/**
  * Builds and maintains the Lucene index of the local filesystem.
  *
  * Indexing always writes to a temporary directory first and only swaps it
@@ -179,10 +188,18 @@ class DBManager(
         _lastError.value = null
     }
 
+    /**
+     * True if a full rebuild is needed: no index yet, or one was last written by a schema
+     * version older than [INDEX_SCHEMA_VERSION] - see that constant's doc. A state file from
+     * before schema versioning existed has no second line, which parses as schema version 1.
+     */
     private fun readStateFile(): Boolean {
         if (!Files.exists(stateFilePath)) return true
         return try {
-            Files.readAllLines(stateFilePath).getOrNull(0)?.toBoolean() ?: true
+            val lines = Files.readAllLines(stateFilePath)
+            val wasFirstIndexCreation = lines.getOrNull(0)?.toBoolean() ?: true
+            val storedSchemaVersion = lines.getOrNull(1)?.toIntOrNull() ?: 1
+            wasFirstIndexCreation || storedSchemaVersion < INDEX_SCHEMA_VERSION
         } catch (e: IOException) {
             Logger.error("Error reading state file", e)
             true
@@ -193,7 +210,7 @@ class DBManager(
         try {
             Files.write(
                 stateFilePath,
-                listOf(isFirstIndexCreation.toString()),
+                listOf(isFirstIndexCreation.toString(), INDEX_SCHEMA_VERSION.toString()),
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING
             )
         } catch (e: IOException) {

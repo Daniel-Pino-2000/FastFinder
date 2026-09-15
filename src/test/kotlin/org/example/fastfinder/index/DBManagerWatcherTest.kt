@@ -10,6 +10,7 @@ import org.apache.lucene.search.TermQuery
 import org.apache.lucene.store.FSDirectory
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -127,6 +128,44 @@ class DBManagerWatcherTest {
             )
         } finally {
             dbManager.close()
+        }
+    }
+
+    @Test
+    fun `createOrUpdateIndex rebuilds when the on-disk index predates the current schema version`(
+        @TempDir tempDir: Path,
+    ) {
+        val root = File(tempDir.toFile(), "root").apply { mkdirs() }
+        val appDataDir = tempDir.resolve("appdata")
+
+        val firstManager = DBManager(indexDirectoryName = "unused", baseDirectory = appDataDir)
+        try {
+            firstManager.createOrUpdateIndex(forceIndexCreation = true, roots = listOf(root))
+            awaitIndexingDone(firstManager)
+        } finally {
+            firstManager.close()
+        }
+
+        // Simulate a state file written before schema versioning existed - just the
+        // isFirstIndexCreation line, no schema version line.
+        val stateFile = appDataDir.resolve("unused").resolve("index_state.txt")
+        Files.write(stateFile, listOf("false"))
+
+        // Only a full rebuild - not the live watcher, which only reports events from the
+        // moment it attaches - would ever pick this up.
+        val addedBeforeRestart = File(root, "added_before_restart.txt").apply { writeText("new") }
+
+        val secondManager = DBManager(indexDirectoryName = "unused", baseDirectory = appDataDir)
+        try {
+            secondManager.createOrUpdateIndex(roots = listOf(root))
+            awaitIndexingDone(secondManager)
+
+            assertTrue(
+                hitCountFor(secondManager.indexPath, addedBeforeRestart) > 0,
+                "A schema-version mismatch should force a full rebuild, not the normal skip-if-exists startup path",
+            )
+        } finally {
+            secondManager.close()
         }
     }
 

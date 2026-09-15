@@ -120,6 +120,24 @@ class DBManagerIndexingTest {
     }
 
     @Test
+    fun `files and directories are indexed with their actual last-modified time`(@TempDir tempDir: Path) {
+        val root = File(tempDir.toFile(), "root").apply { mkdirs() }
+        val file = File(root, "a.txt").apply { writeText("hi") }
+
+        indexAndOpen(root, tempDir) { searcher ->
+            val fileHits = searcher.search(TermQuery(Term("path", file.absolutePath)), 1)
+            val fileModified = searcher.doc(fileHits.scoreDocs[0].doc).get("modified")?.toLongOrNull()
+            assertNotNull(fileModified)
+            assertEquals(file.lastModified(), fileModified)
+
+            val rootHits = searcher.search(TermQuery(Term("path", root.absolutePath)), 1)
+            val rootModified = searcher.doc(rootHits.scoreDocs[0].doc).get("modified")?.toLongOrNull()
+            assertNotNull(rootModified)
+            assertEquals(root.lastModified(), rootModified)
+        }
+    }
+
+    @Test
     fun `regular folder that merely contains a restricted name as a substring is not skipped`(@TempDir tempDir: Path) {
         val root = File(tempDir.toFile(), "root").apply { mkdirs() }
         val lookalike = File(root, "Windows Notes").apply { mkdirs() }
