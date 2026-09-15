@@ -26,6 +26,7 @@ import org.example.fastfinder.util.AppPreferencesStore
 import org.example.fastfinder.util.Logger
 import java.awt.Dimension
 import java.awt.GraphicsEnvironment
+import javax.swing.UIManager
 
 private const val WINDOW_SIZE_SAVE_DEBOUNCE_MS = 500L
 
@@ -57,6 +58,15 @@ private const val DEFAULT_WINDOW_WIDTH_FRACTION = 0.7
 private const val DEFAULT_WINDOW_HEIGHT_FRACTION = 0.75
 
 fun main(args: Array<String>) {
+    // Without this, Swing's dialogs (the folder picker, the elevation/error prompts) render with
+    // whichever look-and-feel the launching JVM happens to default to - which differs by JDK
+    // vendor/build (e.g. JetBrains Runtime vs. a plain OpenJDK build), so the same code can show
+    // a native-looking Windows folder picker under one JVM and the plain cross-platform "Metal"
+    // look under another. Forcing it here makes every Swing dialog match the OS consistently
+    // regardless of which JVM launched the app. Best-effort: a failure here just leaves Swing's
+    // default in place rather than blocking startup over a cosmetic setting.
+    runCatching { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()) }
+
     // Acquired before elevation, not after: a process that hasn't elevated yet still holds this
     // lock while its UAC prompt is up, so a near-simultaneous second launch (e.g. an impatient
     // double-click) is turned away here instead of firing its own redundant UAC prompt. See
