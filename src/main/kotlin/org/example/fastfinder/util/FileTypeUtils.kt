@@ -43,7 +43,9 @@ private val ARCHIVE_EXTENSIONS = setOf(
 private val CODE_EXTENSIONS = setOf(
     "kt", "kts", "java", "py", "js", "jsx", "ts", "tsx", "html", "htm", "css",
     "scss", "less", "json", "xml", "yaml", "yml", "c", "cc", "cpp", "cxx", "h",
-    "hpp", "cs", "go", "rs", "php", "rb", "swift", "sql", "sh", "ps1", "gradle",
+    // "sh" deliberately isn't here - it's classified as Executable below, alongside "bat",
+    // matching how both are launched (run directly) rather than opened in an editor.
+    "hpp", "cs", "go", "rs", "php", "rb", "swift", "sql", "ps1", "gradle",
     "dart", "lua", "r", "scala", "pl", "groovy", "toml", "ini", "cfg", "conf",
     "vue", "svelte", "sass", "makefile", "cmake", "gitignore", "editorconfig",
 )
