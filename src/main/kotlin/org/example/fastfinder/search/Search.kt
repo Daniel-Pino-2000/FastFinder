@@ -51,11 +51,14 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
         searchMode: SearchMode = SearchMode.ALL,
         resultFilter: SearchFilter = SearchFilter.ALL,
         sizeFilter: SizeFilter = SizeFilter.ANY,
+        // Off by default (substring match, the common case): the name/path must equal the query
+        // exactly (case-insensitively) rather than merely contain it.
+        exactMatch: Boolean = false,
     ): List<SystemItem> {
         return if (customSearchDirectory != null) {
-            searchInDirectory(query, customSearchDirectory, searchMode, resultFilter, sizeFilter)
+            searchInDirectory(query, customSearchDirectory, searchMode, resultFilter, sizeFilter, exactMatch)
         } else {
-            searchIndex(query, searchMode, resultFilter, sizeFilter)
+            searchIndex(query, searchMode, resultFilter, sizeFilter, exactMatch)
         }
     }
 
@@ -68,7 +71,9 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
         }
     }
 
-    private fun searchIndex(query: String, searchMode: SearchMode, resultFilter: SearchFilter, sizeFilter: SizeFilter): List<SystemItem> {
+    private fun searchIndex(
+        query: String, searchMode: SearchMode, resultFilter: SearchFilter, sizeFilter: SizeFilter, exactMatch: Boolean,
+    ): List<SystemItem> {
         if (dbManager.isFirstIndexCreation || dbManager.isIndexing.value) {
             Logger.info("Index is not ready yet; skipping search.")
             return emptyList()
@@ -84,7 +89,7 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
             val searcher = manager.acquire()
             try {
                 val booleanQuery = BooleanQuery.Builder().apply {
-                    terms.forEach { term -> add(WildcardQuery(Term("name", "*$term*")), BooleanClause.Occur.MUST) }
+                    addNameClauses(query, terms, exactMatch)
                     when (searchMode) {
                         SearchMode.FILES -> add(TermQuery(Term("isFile", "true")), BooleanClause.Occur.MUST)
                         SearchMode.DIRECTORIES -> add(TermQuery(Term("isFile", "false")), BooleanClause.Occur.MUST)
@@ -144,6 +149,7 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
         searchMode: SearchMode,
         resultFilter: SearchFilter,
         sizeFilter: SizeFilter,
+        exactMatch: Boolean,
     ): List<SystemItem> {
         require(targetDirectory.exists() && targetDirectory.isDirectory) {
             "Provided path is not a valid directory: ${targetDirectory.absolutePath}"
@@ -151,6 +157,7 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
 
         val terms = query.toSearchTerms()
         if (terms.isEmpty()) return emptyList()
+        val trimmedQuery = query.trim()
         val matches = mutableListOf<SystemItem>()
 
         try {
@@ -158,7 +165,7 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
                 override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
                     try {
                         if (searchMode != SearchMode.DIRECTORIES &&
-                            matchesAllTerms(file.fileName.toString(), terms) &&
+                            matchesQuery(file.fileName.toString(), terms, exactMatch, trimmedQuery) &&
                             matchesFileFilters(file, attrs, searchMode, resultFilter, sizeFilter)
                         ) {
                             matches.add(
@@ -179,7 +186,7 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
 
                 override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
                     val name = dir.fileName?.toString().orEmpty()
-                    if (searchMode != SearchMode.FILES && matchesAllTerms(name, terms)) {
+                    if (searchMode != SearchMode.FILES && matchesQuery(name, terms, exactMatch, trimmedQuery)) {
                         matches.add(
                             SystemItem(
                                 dir.toAbsolutePath().toString(),
@@ -211,6 +218,22 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
     private fun matchesAllTerms(name: String, terms: List<String>): Boolean {
         val lower = name.lowercase()
         return terms.all { lower.contains(it) }
+    }
+
+    private fun matchesQuery(name: String, terms: List<String>, exactMatch: Boolean, trimmedQuery: String): Boolean =
+        if (exactMatch) name.equals(trimmedQuery, ignoreCase = true) else matchesAllTerms(name, terms)
+
+    /**
+     * "name" is indexed as one literal lowercased token (see DBManager.addToIndex), so an exact
+     * match is a plain TermQuery against the whole trimmed query rather than the per-term
+     * substring-AND wildcard match used otherwise.
+     */
+    private fun BooleanQuery.Builder.addNameClauses(query: String, terms: List<String>, exactMatch: Boolean) {
+        if (exactMatch) {
+            add(TermQuery(Term("name", query.trim().lowercase())), BooleanClause.Occur.MUST)
+        } else {
+            terms.forEach { term -> add(WildcardQuery(Term("name", "*$term*")), BooleanClause.Occur.MUST) }
+        }
     }
 
     /**

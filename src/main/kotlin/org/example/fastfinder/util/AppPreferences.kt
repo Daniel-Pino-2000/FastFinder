@@ -33,6 +33,14 @@ data class AppPreferences(
     // and set back to true only after the user explicitly enables it and elevation succeeds (see
     // FastFinderApp's settings toggle).
     val elevationEnabled: Boolean = false,
+    // On by default: most peer tools (Everything, Listary) index Program Files/Windows out of the
+    // box, since "where's that .exe" is a common search - see DBManager's restrictedRoots doc for
+    // the folders this actually covers. Recycle Bin/System Volume Information are excluded
+    // unconditionally regardless of this setting, since they're never a meaningful search target.
+    val includeSystemFolders: Boolean = true,
+    // Off by default, matching Everything's own default substring search - checking this trades
+    // "finds anything containing my query" for "only the file/folder named exactly this".
+    val exactMatch: Boolean = false,
 )
 
 /**
@@ -65,6 +73,8 @@ object AppPreferencesStore {
                 windowWidth = props.getProperty("windowWidth")?.toIntOrNull(),
                 windowHeight = props.getProperty("windowHeight")?.toIntOrNull(),
                 elevationEnabled = props.getProperty("elevationEnabled").toBooleanOr(false),
+                includeSystemFolders = props.getProperty("includeSystemFolders").toBooleanOr(true),
+                exactMatch = props.getProperty("exactMatch").toBooleanOr(false),
             )
         } catch (e: IOException) {
             Logger.warn("Could not read preferences file, falling back to defaults: ${e.message}")
@@ -86,6 +96,8 @@ object AppPreferencesStore {
             preferences.windowWidth?.let { setProperty("windowWidth", it.toString()) }
             preferences.windowHeight?.let { setProperty("windowHeight", it.toString()) }
             setProperty("elevationEnabled", preferences.elevationEnabled.toString())
+            setProperty("includeSystemFolders", preferences.includeSystemFolders.toString())
+            setProperty("exactMatch", preferences.exactMatch.toString())
         }
         try {
             Files.createDirectories(file.toAbsolutePath().parent)

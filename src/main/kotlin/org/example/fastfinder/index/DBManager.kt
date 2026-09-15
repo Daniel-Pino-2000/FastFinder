@@ -56,12 +56,16 @@ private const val USN_CHECKPOINTS_FILE_NAME = "usn_checkpoints.properties"
 
 /**
  * Bump this whenever a field is added to (or changed in) the Lucene document schema built by
- * [DBManager.addToIndex]. A mismatch against the version last written to the state file forces a
- * full rebuild on next launch instead of silently reusing an on-disk index that's missing the new
- * field - e.g. the "modified" field added for date sorting would otherwise stay unset for every
- * item indexed before the upgrade, since normal startup only rebuilds when there's no index yet.
+ * [DBManager.addToIndex], or the default set of what gets walked into the index changes. A
+ * mismatch against the version last written to the state file forces a full rebuild on next
+ * launch instead of silently reusing an on-disk index built under different rules - e.g. the
+ * "modified" field added for date sorting would otherwise stay unset for every item indexed
+ * before that upgrade, since normal startup only rebuilds when there's no index yet. Bumped again
+ * when [DBManager.includeSystemFolders] defaulted to true, so upgrading users actually get
+ * Program Files/Windows content the first time, instead of it silently staying excluded until
+ * they happen to trigger a rebuild some other way.
  */
-internal const val INDEX_SCHEMA_VERSION = 3
+internal const val INDEX_SCHEMA_VERSION = 4
 
 /** Bundles a document's two timestamp fields so [DBManager.addToIndex] stays under the parameter-count limit. */
 private data class FileTimestamps(val modified: Long, val created: Long)
@@ -81,11 +85,25 @@ class DBManager(
     // How many indexed items pass between progress updates - throttled so the fork-join
     // indexing threads aren't all hammering a shared StateFlow write on every single file.
     private val progressUpdateInterval: Int = 1000,
+    initialIncludeSystemFolders: Boolean = true,
 ) {
     private val analyzer = StandardAnalyzer()
     private val totalIndexed = AtomicInteger(0)
     private val skippedPaths = Collections.synchronizedList(mutableListOf<String>())
     private val lock = ReentrantLock()
+
+    // @Volatile: read by every indexing thread (the fork-join walk, the watcher's own thread) but
+    // only ever written from the UI thread via setIncludeSystemFolders - a plain var risks a
+    // worker thread never observing a toggle flipped just before createOrUpdateIndex(force=true)
+    // kicks off the rebuild that's supposed to apply it.
+    @Volatile
+    var includeSystemFolders: Boolean = initialIncludeSystemFolders
+        private set
+
+    /** Caller must trigger a rebuild ([createOrUpdateIndex] with force=true) for this to take effect. */
+    fun setIncludeSystemFolders(value: Boolean) {
+        includeSystemFolders = value
+    }
 
     val indexPath: Path
     private val stateFilePath: Path
@@ -364,18 +382,16 @@ class DBManager(
     }
 
     /**
-     * System directories to skip. The Windows and Program Files paths are resolved
-     * from environment variables rather than hardcoded, since they can be relocated
-     * (unattended installs, corporate imaging) and Windows-on-ARM adds a third
-     * "Program Files (Arm)" folder that a fixed literal list would miss.
+     * The Windows and Program Files folders - excluded from the index only when
+     * [includeSystemFolders] is off. Resolved from environment variables rather than hardcoded,
+     * since they can be relocated (unattended installs, corporate imaging) and Windows-on-ARM
+     * adds a third "Program Files (Arm)" folder that a fixed literal list would miss.
      *
-     * Matching is by exact path prefix ([Path.startsWith], which NIO's Windows
-     * provider already compares case-insensitively) or exact folder name for the
-     * per-drive reserved folders, not a substring search over the whole path -
-     * a substring check would also (wrongly) skip an unrelated folder that merely
-     * contains one of these words, e.g. "D:\ProgramFilesBackup".
+     * On by default: most peer search tools (Everything, Listary) index these out of the box,
+     * since "where's that .exe" is a common search - see [org.example.fastfinder.util.AppPreferences]'s
+     * `includeSystemFolders` doc.
      */
-    private val restrictedRoots: List<Path> = listOfNotNull(
+    private val systemFolderRoots: List<Path> = listOfNotNull(
         System.getenv("SystemRoot"),
         System.getenv("windir"),
         System.getenv("ProgramFiles"),
@@ -383,12 +399,20 @@ class DBManager(
         System.getenv("ProgramFiles(Arm)"),
     ).mapNotNull { runCatching { Paths.get(it) }.getOrNull() }.distinct()
 
+    /** Never indexed regardless of [includeSystemFolders] - metadata/trash, never a meaningful search target. */
     private val restrictedNames = setOf("\$recycle.bin", "system volume information")
 
-    private fun isRestrictedDirectory(path: Path): Boolean {
+    /**
+     * Matching against [systemFolderRoots] is by exact path prefix ([Path.startsWith], which
+     * NIO's Windows provider already compares case-insensitively), and against [restrictedNames]
+     * by exact folder name - not a substring search over the whole path, which would also
+     * (wrongly) skip an unrelated folder that merely contains one of these words, e.g.
+     * "D:\ProgramFilesBackup".
+     */
+    internal fun isRestrictedDirectory(path: Path): Boolean {
         val name = path.fileName?.toString()?.lowercase()
         if (name != null && name in restrictedNames) return true
-        return restrictedRoots.any { path.startsWith(it) }
+        return !includeSystemFolders && systemFolderRoots.any { path.startsWith(it) }
     }
 
     /**

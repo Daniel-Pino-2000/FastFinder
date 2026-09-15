@@ -78,6 +78,7 @@ fun FastFinderApp(dbManager: DBManager, fastSync: FastSyncState) {
     var sizeFilter by remember { mutableStateOf(initialPreferences.sizeFilter) }
     var sortBy by remember { mutableStateOf(initialPreferences.sortBy) }
     var sortAscending by remember { mutableStateOf(initialPreferences.sortAscending) }
+    var exactMatch by remember { mutableStateOf(initialPreferences.exactMatch) }
     var results by remember { mutableStateOf(emptyList<SystemItem>()) }
 
     // The folder the current custom search is scoped to. Set as soon as the picker returns a
@@ -86,11 +87,14 @@ fun FastFinderApp(dbManager: DBManager, fastSync: FastSyncState) {
     var activeCustomSearchDirectory by remember { mutableStateOf<File?>(null) }
     val searchBarFocusRequester = remember { FocusRequester() }
     var isDarkTheme by remember { mutableStateOf(initialPreferences.darkTheme) }
+    var includeSystemFolders by remember { mutableStateOf(dbManager.includeSystemFolders) }
 
     // Persists theme/filter/sort choices across restarts. Reads the current file before
     // writing so this doesn't clobber the window size Main.kt saves independently into the
     // same preferences file.
-    LaunchedEffect(isDarkTheme, searchMode, resultFilter, sizeFilter, sortBy, sortAscending) {
+    LaunchedEffect(
+        isDarkTheme, searchMode, resultFilter, sizeFilter, sortBy, sortAscending, exactMatch, includeSystemFolders,
+    ) {
         withContext(Dispatchers.IO) {
             AppPreferencesStore.update {
                 it.copy(
@@ -100,9 +104,21 @@ fun FastFinderApp(dbManager: DBManager, fastSync: FastSyncState) {
                     sizeFilter = sizeFilter,
                     sortBy = sortBy,
                     sortAscending = sortAscending,
+                    exactMatch = exactMatch,
+                    includeSystemFolders = includeSystemFolders,
                 )
             }
         }
+    }
+
+    // Takes effect immediately (a full rebuild, same as the "Update Database" button) rather than
+    // only on the next incidental rebuild - DBManager.isRestrictedDirectory only consults this at
+    // walk time, so without a rebuild here the toggle would silently do nothing until one
+    // happened to happen some other way.
+    fun onIncludeSystemFoldersChange(value: Boolean) {
+        includeSystemFolders = value
+        dbManager.setIncludeSystemFolders(value)
+        dbManager.createOrUpdateIndex(forceIndexCreation = true)
     }
 
     // Tracks whichever search is currently in flight so a newer search always cancels an
@@ -115,7 +131,7 @@ fun FastFinderApp(dbManager: DBManager, fastSync: FastSyncState) {
         searchJob = coroutineScope.launch {
             if (debounce) delay(250)
             val searchResults = withContext(Dispatchers.IO) {
-                search.search(query, directory, searchMode, resultFilter, sizeFilter)
+                search.search(query, directory, searchMode, resultFilter, sizeFilter, exactMatch)
             }
             results = searchResults
         }
@@ -133,7 +149,7 @@ fun FastFinderApp(dbManager: DBManager, fastSync: FastSyncState) {
     // active custom-search scope changes. Deliberately doesn't check isFirstIndexCreation/show a
     // dialog here (unlike runSearch): Search.search() already no-ops safely while the index isn't
     // ready, and popping a modal on every keystroke would be a real bug, not just noise.
-    LaunchedEffect(searchQuery, searchMode, resultFilter, sizeFilter, activeCustomSearchDirectory) {
+    LaunchedEffect(searchQuery, searchMode, resultFilter, sizeFilter, activeCustomSearchDirectory, exactMatch) {
         launchSearch(searchQuery, activeCustomSearchDirectory, debounce = true)
     }
 
@@ -175,6 +191,8 @@ fun FastFinderApp(dbManager: DBManager, fastSync: FastSyncState) {
                         }
                     },
                     onUpdateDatabase = { dbManager.createOrUpdateIndex(forceIndexCreation = true) },
+                    includeSystemFolders = includeSystemFolders,
+                    onIncludeSystemFoldersChange = ::onIncludeSystemFoldersChange,
                     fastSync = fastSync,
                 )
 
@@ -187,6 +205,8 @@ fun FastFinderApp(dbManager: DBManager, fastSync: FastSyncState) {
                         searchQuery = searchQuery,
                         onSearchQueryChange = { searchQuery = it },
                         onSearch = { runSearch(activeCustomSearchDirectory) },
+                        exactMatch = exactMatch,
+                        onExactMatchChange = { exactMatch = it },
                         focusRequester = searchBarFocusRequester,
                         modifier = Modifier.padding(12.dp),
                     )

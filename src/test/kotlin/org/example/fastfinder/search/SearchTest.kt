@@ -304,4 +304,73 @@ class SearchTest {
 
         search.close()
     }
+
+    @Test
+    fun `custom directory search with exactMatch requires the full name, not just a substring`(
+        @TempDir tempDir: Path,
+        @TempDir appDataDir: Path,
+    ) {
+        val root = tempDir.toFile()
+        File(root, "report.pdf").writeText("x")
+        // Ends with "report.pdf" - a substring match, not an exact one.
+        File(root, "quarterly_report.pdf").writeText("x")
+
+        val search = Search(DBManager(indexDirectoryName = "test-index", baseDirectory = appDataDir))
+
+        val substringMatch = search.search("report.pdf", customSearchDirectory = root)
+        assertEquals(
+            setOf("report.pdf", "quarterly_report.pdf"),
+            substringMatch.map { it.itemPath.substringAfterLast(File.separatorChar) }.toSet(),
+        )
+
+        val exact = search.search("report.pdf", customSearchDirectory = root, exactMatch = true)
+        assertEquals(listOf("report.pdf"), exact.map { it.itemPath.substringAfterLast(File.separatorChar) })
+
+        // Case-insensitive, matching every other name comparison in this file.
+        val exactDifferentCase = search.search("REPORT.PDF", customSearchDirectory = root, exactMatch = true)
+        assertEquals(
+            listOf("report.pdf"),
+            exactDifferentCase.map { it.itemPath.substringAfterLast(File.separatorChar) },
+        )
+
+        search.close()
+    }
+
+    @Test
+    fun `indexed search with exactMatch requires the full name, not just a substring`(
+        @TempDir tempDir: Path,
+        @TempDir appDataDir: Path,
+    ) {
+        val root = File(tempDir.toFile(), "root").apply { mkdirs() }
+        File(root, "report.pdf").writeText("x")
+        File(root, "quarterly_report.pdf").writeText("x")
+
+        val (_, search) = indexedSearchOver(appDataDir, root)
+
+        val substringMatch = search.search("report.pdf")
+        assertEquals(
+            setOf("report.pdf", "quarterly_report.pdf"),
+            substringMatch.map { it.itemPath.substringAfterLast(File.separatorChar) }.toSet(),
+        )
+
+        val exact = search.search("report.pdf", exactMatch = true)
+        assertEquals(listOf("report.pdf"), exact.map { it.itemPath.substringAfterLast(File.separatorChar) })
+
+        search.close()
+    }
+
+    @Test
+    fun `exactMatch on a blank query still matches nothing`(
+        @TempDir tempDir: Path,
+        @TempDir appDataDir: Path,
+    ) {
+        val root = tempDir.toFile()
+        File(root, "anything.txt").writeText("x")
+
+        val search = Search(DBManager(indexDirectoryName = "test-index", baseDirectory = appDataDir))
+        val results = search.search("   ", customSearchDirectory = root, exactMatch = true)
+        search.close()
+
+        assertTrue(results.isEmpty())
+    }
 }

@@ -100,8 +100,8 @@ fun main(args: Array<String>) {
 
 @Composable
 private fun ApplicationScope.runApp(args: Array<String>) {
-    val dbManager = remember { DBManager() }
     val initialPreferences = remember { AppPreferencesStore.load() }
+    val dbManager = remember { DBManager(initialIncludeSystemFolders = initialPreferences.includeSystemFolders) }
     val coroutineScope = rememberCoroutineScope()
     // Whether this process itself is currently elevated - fixed for the process's whole
     // lifetime, unlike fastSyncEnabled below: a successful elevation always exits this process to

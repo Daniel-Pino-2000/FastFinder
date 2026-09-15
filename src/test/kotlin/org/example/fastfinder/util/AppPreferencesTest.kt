@@ -30,6 +30,8 @@ class AppPreferencesTest {
             sortAscending = false,
             windowWidth = 1440,
             windowHeight = 900,
+            includeSystemFolders = false,
+            exactMatch = true,
         )
 
         AppPreferencesStore.save(saved, file)

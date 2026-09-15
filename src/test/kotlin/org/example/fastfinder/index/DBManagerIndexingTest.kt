@@ -11,11 +11,13 @@ import org.apache.lucene.index.Term
 import org.apache.lucene.search.IndexSearcher
 import org.apache.lucene.search.TermQuery
 import org.apache.lucene.store.FSDirectory
+import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
 import java.io.RandomAccessFile
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.Paths
 import java.nio.file.attribute.BasicFileAttributes
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -173,6 +175,39 @@ class DBManagerIndexingTest {
 
     private fun newDbManager(tempDir: Path) =
         DBManager(indexDirectoryName = "unused", baseDirectory = tempDir.resolve("appdata"))
+
+    @Test
+    fun `Program Files is restricted only when includeSystemFolders is off`(@TempDir tempDir: Path) {
+        val programFiles = System.getenv("ProgramFiles")?.let { Paths.get(it) }
+        assumeTrue(programFiles != null, "ProgramFiles env var not set - skipping on a non-Windows environment")
+        val someApp = programFiles!!.resolve("SomeApp")
+
+        val includedByDefault = newDbManager(tempDir)
+        assertFalse(includedByDefault.isRestrictedDirectory(someApp), "Program Files should be indexed by default")
+
+        val excluded = DBManager(
+            indexDirectoryName = "unused",
+            baseDirectory = tempDir.resolve("appdata2"),
+            initialIncludeSystemFolders = false,
+        )
+        assertTrue(excluded.isRestrictedDirectory(someApp))
+
+        excluded.setIncludeSystemFolders(true)
+        assertFalse(excluded.isRestrictedDirectory(someApp), "Toggling back on should take effect immediately")
+    }
+
+    @Test
+    fun `Recycle Bin and System Volume Information stay restricted regardless of includeSystemFolders`(
+        @TempDir tempDir: Path,
+    ) {
+        val root = File(tempDir.toFile(), "root").apply { mkdirs() }
+        val recycleBin = File(root, "\$Recycle.Bin").toPath()
+        val systemVolumeInfo = File(root, "System Volume Information").toPath()
+
+        val dbManager = newDbManager(tempDir)
+        assertTrue(dbManager.isRestrictedDirectory(recycleBin))
+        assertTrue(dbManager.isRestrictedDirectory(systemVolumeInfo))
+    }
 
     /** Blocks (with a generous timeout) until a background [DBManager.createOrUpdateIndex] run finishes. */
     private fun awaitIndexingDone(dbManager: DBManager) = runBlocking {

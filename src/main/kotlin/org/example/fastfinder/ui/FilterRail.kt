@@ -74,6 +74,8 @@ fun FilterRail(
     onToggleTheme: () -> Unit,
     onCustomSearch: () -> Unit,
     onUpdateDatabase: () -> Unit,
+    includeSystemFolders: Boolean,
+    onIncludeSystemFoldersChange: (Boolean) -> Unit,
     fastSync: FastSyncState,
     modifier: Modifier = Modifier,
 ) {
@@ -149,6 +151,8 @@ fun FilterRail(
                     )
                 }
             }
+
+            IndexScopeRow(includeSystemFolders, onIncludeSystemFoldersChange)
 
             FastSyncRow(fastSync)
             Spacer(modifier = Modifier.height(4.dp))
@@ -331,6 +335,43 @@ private fun RailActionButton(icon: ImageVector, label: String, onClick: () -> Un
             fontSize = 12.5.sp,
             lineHeight = 12.5.sp,
             fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+/**
+ * Whether Program Files/Windows are included in the whole-drive index - on by default (see
+ * [org.example.fastfinder.util.AppPreferences.includeSystemFolders]'s doc). Toggling this
+ * immediately kicks off a full rebuild (the same one "Update Database" triggers) so the change is
+ * reflected right away rather than silently waiting on the next incidental rebuild.
+ */
+@Composable
+private fun IndexScopeRow(includeSystemFolders: Boolean, onIncludeSystemFoldersChange: (Boolean) -> Unit) {
+    val appColors = LocalAppColors.current
+    RailSection(title = "Indexing") {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "Include Program Files & Windows",
+                color = appColors.textPrimary,
+                fontSize = 12.5.sp,
+                modifier = Modifier.weight(1f),
+            )
+            Switch(
+                checked = includeSystemFolders,
+                onCheckedChange = onIncludeSystemFoldersChange,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = appColors.accent,
+                    checkedTrackColor = appColors.accent,
+                ),
+            )
+        }
+        Text(
+            text = "Rebuilds the index now. Recycle Bin and System Volume Information are " +
+                "never indexed either way.",
+            color = appColors.textTertiary,
+            fontSize = 10.5.sp,
+            lineHeight = 14.sp,
+            modifier = Modifier.padding(top = 6.dp, start = 2.dp, end = 2.dp),
         )
     }
 }
