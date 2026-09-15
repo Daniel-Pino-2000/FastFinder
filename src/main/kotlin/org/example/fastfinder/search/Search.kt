@@ -157,8 +157,7 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
                     try {
                         if (searchMode != SearchMode.DIRECTORIES &&
                             matchesAllTerms(file.fileName.toString(), terms) &&
-                            (resultFilter == SearchFilter.ALL || getFileType(file.toFile()) == resultFilter) &&
-                            attrs.size() in sizeFilter.minBytes..sizeFilter.maxBytes
+                            matchesFileFilters(file, attrs, searchMode, resultFilter, sizeFilter)
                         ) {
                             matches.add(SystemItem(file.toAbsolutePath().toString(), isFile = true, itemSize = attrs.size()))
                         }
@@ -194,5 +193,23 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
     private fun matchesAllTerms(name: String, terms: List<String>): Boolean {
         val lower = name.lowercase()
         return terms.all { lower.contains(it) }
+    }
+
+    /**
+     * resultFilter/sizeFilter only apply in FILES mode, matching searchIndex's own gating -
+     * applying them unconditionally (as this used to) meant a stale non-ALL/non-ANY filter left
+     * over from a previous FILES-mode search silently hid every non-matching file even in ALL
+     * mode, where the filter controls are shown disabled and look inactive.
+     */
+    private fun matchesFileFilters(
+        file: Path,
+        attrs: BasicFileAttributes,
+        searchMode: SearchMode,
+        resultFilter: SearchFilter,
+        sizeFilter: SizeFilter,
+    ): Boolean {
+        if (searchMode != SearchMode.FILES) return true
+        val matchesType = resultFilter == SearchFilter.ALL || getFileType(file.toFile()) == resultFilter
+        return matchesType && attrs.size() in sizeFilter.minBytes..sizeFilter.maxBytes
     }
 }

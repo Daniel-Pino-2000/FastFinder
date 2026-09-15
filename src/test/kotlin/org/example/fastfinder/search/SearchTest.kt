@@ -116,6 +116,36 @@ class SearchTest {
     }
 
     @Test
+    fun `custom directory search in ALL mode ignores a resultFilter and sizeFilter left over from FILES mode`(
+        @TempDir tempDir: Path,
+        @TempDir appDataDir: Path,
+    ) {
+        val root = tempDir.toFile()
+        File(root, "report.pdf").writeText("x")
+        File(root, "report.png").writeText("x")
+        File(root, "report_folder").mkdirs()
+
+        val search = Search(DBManager(indexDirectoryName = "test-index", baseDirectory = appDataDir))
+
+        // A resultFilter/sizeFilter combination that would hide every one of these files if
+        // mistakenly applied outside FILES mode (EXECUTABLE matches none of them, and OVER_1GB
+        // excludes every one of these tiny test files) - ALL mode must ignore both entirely,
+        // exactly like the whole-index search path and the results list's own isVisible() do.
+        val results = search.search(
+            "report",
+            customSearchDirectory = root,
+            searchMode = SearchMode.ALL,
+            resultFilter = SearchFilter.EXECUTABLE,
+            sizeFilter = SizeFilter.OVER_1GB,
+        )
+
+        val names = results.map { it.itemPath.substringAfterLast(File.separatorChar) }.toSet()
+        assertEquals(setOf("report.pdf", "report.png", "report_folder"), names)
+
+        search.close()
+    }
+
+    @Test
     fun `custom directory search honors the size filter`(
         @TempDir tempDir: Path,
         @TempDir appDataDir: Path,
