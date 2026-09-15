@@ -109,7 +109,8 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
                     SystemItem(
                         itemPath = path,
                         isFile = doc.get("isFile")?.toBoolean() ?: false,
-                        itemSize = doc.get("sizeDisplay")?.toLongOrNull()
+                        itemSize = doc.get("sizeDisplay")?.toLongOrNull(),
+                        itemDate = doc.get("modified")?.toLongOrNull()
                     )
                 }.distinctBy { it.itemPath }
             } finally {
@@ -159,7 +160,14 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
                             matchesAllTerms(file.fileName.toString(), terms) &&
                             matchesFileFilters(file, attrs, searchMode, resultFilter, sizeFilter)
                         ) {
-                            matches.add(SystemItem(file.toAbsolutePath().toString(), isFile = true, itemSize = attrs.size()))
+                            matches.add(
+                                SystemItem(
+                                    file.toAbsolutePath().toString(),
+                                    isFile = true,
+                                    itemSize = attrs.size(),
+                                    itemDate = attrs.lastModifiedTime().toMillis(),
+                                )
+                            )
                         }
                     } catch (e: AccessDeniedException) {
                         Logger.warn("Access denied to file: $file (${e.message})")
@@ -170,7 +178,14 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
                 override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
                     val name = dir.fileName?.toString().orEmpty()
                     if (searchMode != SearchMode.FILES && matchesAllTerms(name, terms)) {
-                        matches.add(SystemItem(dir.toAbsolutePath().toString(), isFile = false, itemSize = null))
+                        matches.add(
+                            SystemItem(
+                                dir.toAbsolutePath().toString(),
+                                isFile = false,
+                                itemSize = null,
+                                itemDate = attrs.lastModifiedTime().toMillis(),
+                            )
+                        )
                     }
                     return FileVisitResult.CONTINUE
                 }

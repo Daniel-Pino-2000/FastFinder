@@ -6,6 +6,9 @@ import org.example.fastfinder.model.SizeFilter
 import org.example.fastfinder.model.SortBy
 import org.example.fastfinder.model.SystemItem
 import java.io.File
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 private val VIDEO_EXTENSIONS = setOf(
     "mp4", "mkv", "avi", "mov", "wmv", "flv", "webm", "mpeg", "mpg", "m4v",
@@ -100,6 +103,7 @@ val SortBy.label: String
         SortBy.NAME -> "Name"
         SortBy.SIZE -> "Size"
         SortBy.TYPE -> "Type"
+        SortBy.DATE -> "Date Modified"
     }
 
 val SizeFilter.label: String
@@ -111,6 +115,14 @@ val SizeFilter.label: String
         SizeFilter.MB100_TO_GB1 -> "100 MB - 1 GB"
         SizeFilter.OVER_1GB -> "> 1 GB"
     }
+
+private val DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+
+/** Formats an epoch-millis last-modified time for display, or "—" if unavailable. */
+fun formatDate(epochMillis: Long?): String {
+    if (epochMillis == null) return "—"
+    return Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).format(DATE_FORMATTER)
+}
 
 fun formatSize(size: Long): String {
     val units = listOf("B", "KB", "MB", "GB", "TB")
@@ -140,6 +152,7 @@ fun systemItemComparator(sortBy: SortBy, ascending: Boolean): Comparator<SystemI
         SortBy.NAME -> compareBy { it.name() }
         SortBy.SIZE -> compareBy { it.itemSize ?: 0L }
         SortBy.TYPE -> compareBy { if (it.isFile) getFileType(File(it.itemPath)).name else "" }
+        SortBy.DATE -> compareBy { it.itemDate ?: 0L }
     }
     val directed = if (ascending) withinGroup else withinGroup.reversed()
     return compareBy<SystemItem> { it.isFile }.then(directed)

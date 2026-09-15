@@ -3,7 +3,9 @@ package org.example.fastfinder.model
 data class SystemItem(
     val itemPath: String,
     val isFile: Boolean,
-    val itemSize: Long?
+    val itemSize: Long?,
+    /** Last-modified time in epoch milliseconds, or null if unavailable. */
+    val itemDate: Long? = null,
 )
 
 enum class SearchMode {
@@ -28,7 +30,8 @@ enum class SearchFilter {
 enum class SortBy {
     NAME,
     SIZE,
-    TYPE
+    TYPE,
+    DATE
 }
 
 /** Bucketed size ranges (inclusive on both ends) for narrowing file search results. */

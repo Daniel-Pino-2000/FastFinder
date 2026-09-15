@@ -36,6 +36,7 @@ import org.example.fastfinder.ui.theme.AppTheme
 import org.example.fastfinder.ui.theme.LocalAppColors
 import org.example.fastfinder.ui.theme.colorFor
 import org.example.fastfinder.util.Logger
+import org.example.fastfinder.util.formatDate
 import org.example.fastfinder.util.formatSize
 import org.example.fastfinder.util.getFileType
 import org.example.fastfinder.util.singularLabel
@@ -51,6 +52,7 @@ fun ResultItem(item: SystemItem) {
     val fileType = remember(item.isFile, item.itemPath) { if (item.isFile) getFileType(File(item.itemPath)) else null }
     val icon = remember(item.isFile, item.itemPath) { iconFor(item) }
     val sizeLabel = remember(item.itemSize) { item.itemSize?.let(::formatSize) ?: "—" }
+    val dateLabel = remember(item.itemDate) { formatDate(item.itemDate) }
     val appColors = LocalAppColors.current
     val iconTint = fileType?.let { appColors.colorFor(it) } ?: appColors.typeFolder
 
@@ -103,6 +105,14 @@ fun ResultItem(item: SystemItem) {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.width(TYPE_COLUMN_WIDTH).padding(start = 8.dp),
+        )
+        Text(
+            text = dateLabel,
+            color = appColors.textSecondary,
+            fontSize = 11.5.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.width(DATE_COLUMN_WIDTH).padding(start = 8.dp),
         )
 
         // Both icons are always emitted (never conditionally, just made invisible/inert via

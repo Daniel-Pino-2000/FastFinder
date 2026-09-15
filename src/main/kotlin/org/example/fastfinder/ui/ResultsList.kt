@@ -39,6 +39,7 @@ internal const val NAME_COLUMN_WEIGHT = 2f
 internal const val PATH_COLUMN_WEIGHT = 3f
 internal val SIZE_COLUMN_WIDTH = 84.dp
 internal val TYPE_COLUMN_WIDTH = 100.dp
+internal val DATE_COLUMN_WIDTH = 120.dp
 internal val ACTIONS_COLUMN_WIDTH = 64.dp
 internal val ICON_COLUMN_WIDTH = 28.dp
 
@@ -128,6 +129,7 @@ private fun ColumnHeader() {
         HeaderLabel("Path", Modifier.weight(PATH_COLUMN_WEIGHT))
         HeaderLabel("Size", Modifier.width(SIZE_COLUMN_WIDTH))
         HeaderLabel("Type", Modifier.width(TYPE_COLUMN_WIDTH))
+        HeaderLabel("Modified", Modifier.width(DATE_COLUMN_WIDTH))
         Box(modifier = Modifier.width(ACTIONS_COLUMN_WIDTH))
     }
 }

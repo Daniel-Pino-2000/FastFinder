@@ -50,6 +50,16 @@ class FileTypeUtilsTest {
     }
 
     @Test
+    fun `formatDate returns a placeholder for null`() {
+        assertEquals("—", formatDate(null))
+    }
+
+    @Test
+    fun `formatDate renders a non-null epoch millis value`() {
+        assertFalse(formatDate(0L) == "—")
+    }
+
+    @Test
     fun `isVisible in ALL mode ignores the result filter`() {
         val file = SystemItem("C:\\video.mp4", isFile = true, itemSize = 10)
         val dir = SystemItem("C:\\folder", isFile = false, itemSize = null)
@@ -147,5 +157,23 @@ class FileTypeUtilsTest {
 
         // AUDIO < DOCUMENT < VIDEO alphabetically by enum name
         assertEquals(listOf("audio.mp3", "doc.pdf", "video.mp4"), names(items.sortedWith(systemItemComparator(SortBy.TYPE, ascending = true))))
+    }
+
+    @Test
+    fun `systemItemComparator sorts by date modified`() {
+        val items = listOf(
+            SystemItem("C:\\medium.txt", isFile = true, itemSize = 1, itemDate = 2000L),
+            SystemItem("C:\\oldest.txt", isFile = true, itemSize = 1, itemDate = 1000L),
+            SystemItem("C:\\newest.txt", isFile = true, itemSize = 1, itemDate = 3000L),
+        )
+
+        assertEquals(
+            listOf("oldest.txt", "medium.txt", "newest.txt"),
+            names(items.sortedWith(systemItemComparator(SortBy.DATE, ascending = true))),
+        )
+        assertEquals(
+            listOf("newest.txt", "medium.txt", "oldest.txt"),
+            names(items.sortedWith(systemItemComparator(SortBy.DATE, ascending = false))),
+        )
     }
 }

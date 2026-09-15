@@ -291,18 +291,24 @@ class DBManager(
                 if (attrs.isDirectory) {
                     subDirectoryTasks.add(IndexDirectoryTask(entry, indexWriter).also { it.fork() })
                 } else {
-                    addToIndex(entry, indexWriter, isFile = true, size = attrs.size())
+                    addToIndex(
+                        entry, indexWriter, isFile = true,
+                        size = attrs.size(), modified = attrs.lastModifiedTime().toMillis(),
+                    )
                     ownFilesSize += attrs.size()
                 }
             }
 
             val subtreeSize = ownFilesSize + subDirectoryTasks.sumOf { it.join() }
-            addToIndex(directory, indexWriter, isFile = false, size = subtreeSize)
+            addToIndex(
+                directory, indexWriter, isFile = false,
+                size = subtreeSize, modified = lastModifiedMillisOrZero(directory),
+            )
             return subtreeSize
         }
     }
 
-    private fun addToIndex(path: Path, indexWriter: IndexWriter, isFile: Boolean, size: Long) {
+    private fun addToIndex(path: Path, indexWriter: IndexWriter, isFile: Boolean, size: Long, modified: Long) {
         val fullFileName = path.fileName?.toString() ?: return
         val document = Document().apply {
             // StringField, not TextField: "name" is only ever queried as a raw WildcardQuery
@@ -320,6 +326,7 @@ class DBManager(
             add(StringField("isFile", isFile.toString(), Field.Store.YES))
             add(LongPoint("size", size))
             add(TextField("sizeDisplay", size.toString(), Field.Store.YES))
+            add(TextField("modified", modified.toString(), Field.Store.YES))
             if (isFile) {
                 // Stored=NO: only ever queried as an exact-match filter, never displayed.
                 add(StringField("type", getFileType(path.toFile()).name.lowercase(), Field.Store.NO))
@@ -751,7 +758,10 @@ class DBManager(
                 }
             } else {
                 currentWriter.deleteDocuments(Term("path", path.toString()))
-                addToIndex(path, currentWriter, isFile = true, size = attrs.size())
+                addToIndex(
+                    path, currentWriter, isFile = true,
+                    size = attrs.size(), modified = attrs.lastModifiedTime().toMillis(),
+                )
             }
         }
 
@@ -774,10 +784,18 @@ class DBManager(
                 when {
                     attrs == null -> 0L
                     attrs.isDirectory -> indexNewDirectory(entry, writer)
-                    else -> attrs.size().also { addToIndex(entry, writer, isFile = true, size = it) }
+                    else -> attrs.size().also {
+                        addToIndex(
+                            entry, writer, isFile = true,
+                            size = it, modified = attrs.lastModifiedTime().toMillis(),
+                        )
+                    }
                 }
             }
-            addToIndex(directory, writer, isFile = false, size = subtreeSize)
+            addToIndex(
+                directory, writer, isFile = false,
+                size = subtreeSize, modified = lastModifiedMillisOrZero(directory),
+            )
             return subtreeSize
         }
 
@@ -822,6 +840,14 @@ private fun readAttributesOrNull(path: Path): BasicFileAttributes? = try {
     // same as a delete event.
     null
 }
+
+/**
+ * A directory's own last-modified time isn't already read anywhere on the indexing paths (only
+ * its children's attrs are, to compute subtree size), so this stats it directly - falling back to
+ * 0 (same as a missing modified date elsewhere) if that fails.
+ */
+private fun lastModifiedMillisOrZero(path: Path): Long =
+    readAttributesOrNull(path)?.lastModifiedTime()?.toMillis() ?: 0L
 
 /** Marks "now" as every real root's USN checkpoint - a fresh full rebuild already reflects current state. */
 private fun resetUsnCheckpoints(checkpointFile: Path, roots: List<File>) {
