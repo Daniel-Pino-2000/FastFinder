@@ -10,6 +10,17 @@ plugins {
 group = "org.example"
 version = "1.0.0"
 
+// Pins the JDK actually used to compile/run this build to 21, independent of whatever JDK
+// happens to be selected as the IDE's Project SDK - without this, pointing the IDE at a newer
+// JDK (e.g. 22+) breaks the build outright ("Kotlin does not yet support 24 JDK target" /
+// "Inconsistent JVM-target compatibility detected for tasks 'compileJava' and 'compileKotlin'"),
+// which looks like a code regression but is really just an unpinned toolchain. Requires a JDK
+// 21 already installed and discoverable by Gradle (matching README's "Requires JDK 21" and CI);
+// this doesn't auto-download one.
+kotlin {
+    jvmToolchain(21)
+}
+
 repositories {
     mavenCentral()
     maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
