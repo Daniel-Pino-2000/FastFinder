@@ -104,6 +104,7 @@ val SortBy.label: String
         SortBy.SIZE -> "Size"
         SortBy.TYPE -> "Type"
         SortBy.DATE -> "Date Modified"
+        SortBy.DATE_CREATED -> "Date Created"
     }
 
 val SizeFilter.label: String
@@ -152,7 +153,8 @@ fun systemItemComparator(sortBy: SortBy, ascending: Boolean): Comparator<SystemI
         SortBy.NAME -> compareBy { it.name() }
         SortBy.SIZE -> compareBy { it.itemSize ?: 0L }
         SortBy.TYPE -> compareBy { if (it.isFile) getFileType(File(it.itemPath)).name else "" }
-        SortBy.DATE -> compareBy { it.itemDate ?: 0L }
+        SortBy.DATE -> compareBy { it.itemModifiedDate ?: 0L }
+        SortBy.DATE_CREATED -> compareBy { it.itemCreatedDate ?: 0L }
     }
     val directed = if (ascending) withinGroup else withinGroup.reversed()
     return compareBy<SystemItem> { it.isFile }.then(directed)

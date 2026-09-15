@@ -5,7 +5,13 @@ data class SystemItem(
     val isFile: Boolean,
     val itemSize: Long?,
     /** Last-modified time in epoch milliseconds, or null if unavailable. */
-    val itemDate: Long? = null,
+    val itemModifiedDate: Long? = null,
+    /**
+     * Creation time in epoch milliseconds, or null if unavailable. Windows resets this to "now"
+     * on copy/move (unlike [itemModifiedDate], which travels with the file's content), so it's
+     * a weaker signal for "when was this made" - offered as a secondary sort, not the default.
+     */
+    val itemCreatedDate: Long? = null,
 )
 
 enum class SearchMode {
@@ -31,7 +37,8 @@ enum class SortBy {
     NAME,
     SIZE,
     TYPE,
-    DATE
+    DATE,
+    DATE_CREATED
 }
 
 /** Bucketed size ranges (inclusive on both ends) for narrowing file search results. */

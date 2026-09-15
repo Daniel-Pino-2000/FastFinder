@@ -162,9 +162,9 @@ class FileTypeUtilsTest {
     @Test
     fun `systemItemComparator sorts by date modified`() {
         val items = listOf(
-            SystemItem("C:\\medium.txt", isFile = true, itemSize = 1, itemDate = 2000L),
-            SystemItem("C:\\oldest.txt", isFile = true, itemSize = 1, itemDate = 1000L),
-            SystemItem("C:\\newest.txt", isFile = true, itemSize = 1, itemDate = 3000L),
+            SystemItem("C:\\medium.txt", isFile = true, itemSize = 1, itemModifiedDate = 2000L),
+            SystemItem("C:\\oldest.txt", isFile = true, itemSize = 1, itemModifiedDate = 1000L),
+            SystemItem("C:\\newest.txt", isFile = true, itemSize = 1, itemModifiedDate = 3000L),
         )
 
         assertEquals(
@@ -174,6 +174,26 @@ class FileTypeUtilsTest {
         assertEquals(
             listOf("newest.txt", "medium.txt", "oldest.txt"),
             names(items.sortedWith(systemItemComparator(SortBy.DATE, ascending = false))),
+        )
+    }
+
+    @Test
+    fun `systemItemComparator sorts by date created, independently of date modified`() {
+        val items = listOf(
+            // Modified order (2000/1000/3000) deliberately doesn't match created order, so this
+            // only passes if DATE_CREATED actually reads itemCreatedDate, not itemModifiedDate.
+            SystemItem("C:\\medium.txt", isFile = true, itemSize = 1, itemModifiedDate = 2000L, itemCreatedDate = 20L),
+            SystemItem("C:\\oldest.txt", isFile = true, itemSize = 1, itemModifiedDate = 1000L, itemCreatedDate = 10L),
+            SystemItem("C:\\newest.txt", isFile = true, itemSize = 1, itemModifiedDate = 3000L, itemCreatedDate = 30L),
+        )
+
+        assertEquals(
+            listOf("oldest.txt", "medium.txt", "newest.txt"),
+            names(items.sortedWith(systemItemComparator(SortBy.DATE_CREATED, ascending = true))),
+        )
+        assertEquals(
+            listOf("newest.txt", "medium.txt", "oldest.txt"),
+            names(items.sortedWith(systemItemComparator(SortBy.DATE_CREATED, ascending = false))),
         )
     }
 }

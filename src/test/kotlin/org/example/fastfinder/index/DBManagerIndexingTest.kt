@@ -16,6 +16,7 @@ import java.io.File
 import java.io.RandomAccessFile
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.BasicFileAttributes
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -134,6 +135,27 @@ class DBManagerIndexingTest {
             val rootModified = searcher.doc(rootHits.scoreDocs[0].doc).get("modified")?.toLongOrNull()
             assertNotNull(rootModified)
             assertEquals(root.lastModified(), rootModified)
+        }
+    }
+
+    private fun creationTimeMillis(file: File): Long =
+        Files.readAttributes(file.toPath(), BasicFileAttributes::class.java).creationTime().toMillis()
+
+    @Test
+    fun `files and directories are indexed with their actual creation time`(@TempDir tempDir: Path) {
+        val root = File(tempDir.toFile(), "root").apply { mkdirs() }
+        val file = File(root, "a.txt").apply { writeText("hi") }
+
+        indexAndOpen(root, tempDir) { searcher ->
+            val fileHits = searcher.search(TermQuery(Term("path", file.absolutePath)), 1)
+            val fileCreated = searcher.doc(fileHits.scoreDocs[0].doc).get("created")?.toLongOrNull()
+            assertNotNull(fileCreated)
+            assertEquals(creationTimeMillis(file), fileCreated)
+
+            val rootHits = searcher.search(TermQuery(Term("path", root.absolutePath)), 1)
+            val rootCreated = searcher.doc(rootHits.scoreDocs[0].doc).get("created")?.toLongOrNull()
+            assertNotNull(rootCreated)
+            assertEquals(creationTimeMillis(root), rootCreated)
         }
     }
 

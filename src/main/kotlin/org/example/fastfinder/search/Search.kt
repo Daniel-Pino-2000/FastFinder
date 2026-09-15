@@ -110,7 +110,8 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
                         itemPath = path,
                         isFile = doc.get("isFile")?.toBoolean() ?: false,
                         itemSize = doc.get("sizeDisplay")?.toLongOrNull(),
-                        itemDate = doc.get("modified")?.toLongOrNull()
+                        itemModifiedDate = doc.get("modified")?.toLongOrNull(),
+                        itemCreatedDate = doc.get("created")?.toLongOrNull()
                     )
                 }.distinctBy { it.itemPath }
             } finally {
@@ -165,7 +166,8 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
                                     file.toAbsolutePath().toString(),
                                     isFile = true,
                                     itemSize = attrs.size(),
-                                    itemDate = attrs.lastModifiedTime().toMillis(),
+                                    itemModifiedDate = attrs.lastModifiedTime().toMillis(),
+                                    itemCreatedDate = attrs.creationTime().toMillis(),
                                 )
                             )
                         }
@@ -183,7 +185,8 @@ class Search(private val dbManager: DBManager) : AutoCloseable {
                                 dir.toAbsolutePath().toString(),
                                 isFile = false,
                                 itemSize = null,
-                                itemDate = attrs.lastModifiedTime().toMillis(),
+                                itemModifiedDate = attrs.lastModifiedTime().toMillis(),
+                                itemCreatedDate = attrs.creationTime().toMillis(),
                             )
                         )
                     }

@@ -61,7 +61,12 @@ private const val USN_CHECKPOINTS_FILE_NAME = "usn_checkpoints.properties"
  * field - e.g. the "modified" field added for date sorting would otherwise stay unset for every
  * item indexed before the upgrade, since normal startup only rebuilds when there's no index yet.
  */
-internal const val INDEX_SCHEMA_VERSION = 2
+internal const val INDEX_SCHEMA_VERSION = 3
+
+/** Bundles a document's two timestamp fields so [DBManager.addToIndex] stays under the parameter-count limit. */
+private data class FileTimestamps(val modified: Long, val created: Long)
+
+private fun BasicFileAttributes.timestamps() = FileTimestamps(lastModifiedTime().toMillis(), creationTime().toMillis())
 
 /**
  * Builds and maintains the Lucene index of the local filesystem.
@@ -308,10 +313,7 @@ class DBManager(
                 if (attrs.isDirectory) {
                     subDirectoryTasks.add(IndexDirectoryTask(entry, indexWriter).also { it.fork() })
                 } else {
-                    addToIndex(
-                        entry, indexWriter, isFile = true,
-                        size = attrs.size(), modified = attrs.lastModifiedTime().toMillis(),
-                    )
+                    addToIndex(entry, indexWriter, isFile = true, size = attrs.size(), timestamps = attrs.timestamps())
                     ownFilesSize += attrs.size()
                 }
             }
@@ -319,13 +321,15 @@ class DBManager(
             val subtreeSize = ownFilesSize + subDirectoryTasks.sumOf { it.join() }
             addToIndex(
                 directory, indexWriter, isFile = false,
-                size = subtreeSize, modified = lastModifiedMillisOrZero(directory),
+                size = subtreeSize, timestamps = directoryTimestampsOrZero(directory),
             )
             return subtreeSize
         }
     }
 
-    private fun addToIndex(path: Path, indexWriter: IndexWriter, isFile: Boolean, size: Long, modified: Long) {
+    private fun addToIndex(
+        path: Path, indexWriter: IndexWriter, isFile: Boolean, size: Long, timestamps: FileTimestamps,
+    ) {
         val fullFileName = path.fileName?.toString() ?: return
         val document = Document().apply {
             // StringField, not TextField: "name" is only ever queried as a raw WildcardQuery
@@ -343,7 +347,8 @@ class DBManager(
             add(StringField("isFile", isFile.toString(), Field.Store.YES))
             add(LongPoint("size", size))
             add(TextField("sizeDisplay", size.toString(), Field.Store.YES))
-            add(TextField("modified", modified.toString(), Field.Store.YES))
+            add(TextField("modified", timestamps.modified.toString(), Field.Store.YES))
+            add(TextField("created", timestamps.created.toString(), Field.Store.YES))
             if (isFile) {
                 // Stored=NO: only ever queried as an exact-match filter, never displayed.
                 add(StringField("type", getFileType(path.toFile()).name.lowercase(), Field.Store.NO))
@@ -775,10 +780,7 @@ class DBManager(
                 }
             } else {
                 currentWriter.deleteDocuments(Term("path", path.toString()))
-                addToIndex(
-                    path, currentWriter, isFile = true,
-                    size = attrs.size(), modified = attrs.lastModifiedTime().toMillis(),
-                )
+                addToIndex(path, currentWriter, isFile = true, size = attrs.size(), timestamps = attrs.timestamps())
             }
         }
 
@@ -802,16 +804,13 @@ class DBManager(
                     attrs == null -> 0L
                     attrs.isDirectory -> indexNewDirectory(entry, writer)
                     else -> attrs.size().also {
-                        addToIndex(
-                            entry, writer, isFile = true,
-                            size = it, modified = attrs.lastModifiedTime().toMillis(),
-                        )
+                        addToIndex(entry, writer, isFile = true, size = it, timestamps = attrs.timestamps())
                     }
                 }
             }
             addToIndex(
                 directory, writer, isFile = false,
-                size = subtreeSize, modified = lastModifiedMillisOrZero(directory),
+                size = subtreeSize, timestamps = directoryTimestampsOrZero(directory),
             )
             return subtreeSize
         }
@@ -859,12 +858,12 @@ private fun readAttributesOrNull(path: Path): BasicFileAttributes? = try {
 }
 
 /**
- * A directory's own last-modified time isn't already read anywhere on the indexing paths (only
- * its children's attrs are, to compute subtree size), so this stats it directly - falling back to
- * 0 (same as a missing modified date elsewhere) if that fails.
+ * A directory's own modified/created times aren't already read anywhere on the indexing paths
+ * (only its children's attrs are, to compute subtree size), so this stats it directly - falling
+ * back to 0 for both (same as elsewhere) if that fails.
  */
-private fun lastModifiedMillisOrZero(path: Path): Long =
-    readAttributesOrNull(path)?.lastModifiedTime()?.toMillis() ?: 0L
+private fun directoryTimestampsOrZero(path: Path): FileTimestamps =
+    readAttributesOrNull(path)?.timestamps() ?: FileTimestamps(modified = 0L, created = 0L)
 
 /** Marks "now" as every real root's USN checkpoint - a fresh full rebuild already reflects current state. */
 private fun resetUsnCheckpoints(checkpointFile: Path, roots: List<File>) {
