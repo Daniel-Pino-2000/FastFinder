@@ -11,6 +11,7 @@ import org.apache.lucene.index.Term
 import org.apache.lucene.search.IndexSearcher
 import org.apache.lucene.search.TermQuery
 import org.apache.lucene.store.FSDirectory
+import org.junit.jupiter.api.Assertions.assertTimeoutPreemptively
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
@@ -19,6 +20,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.attribute.BasicFileAttributes
+import java.time.Duration
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -170,6 +172,43 @@ class DBManagerIndexingTest {
         indexAndOpen(root, tempDir) { searcher ->
             val hits = searcher.search(TermQuery(Term("path", lookalike.absolutePath)), 1)
             assertFalse(hits.totalHits == 0L, "A folder that merely contains 'Windows' in its name should still be indexed")
+        }
+    }
+
+    /** Creates a real NTFS junction at [link] -> [target] - `mklink /J` needs no elevation, unlike a symlink. */
+    private fun createJunction(link: Path, target: Path) {
+        val exitCode = ProcessBuilder("cmd", "/c", "mklink", "/J", link.toString(), target.toString())
+            .redirectErrorStream(true)
+            .start()
+            .waitFor()
+        assertEquals(0, exitCode, "Test setup: mklink /J must succeed to create the junction")
+    }
+
+    @Test
+    fun `a self-referential junction is indexed as a leaf but never recursed into`(@TempDir tempDir: Path) {
+        // Real, confirmed-to-exist-on-Windows shape: a junction inside a directory that points
+        // back to that same directory (see DBManager's isReparsePointDirectory doc for real
+        // examples, e.g. "C:\ProgramData\Application Data" -> "C:\ProgramData"). A walk that
+        // doesn't recognize this recurses into "sub/loop/loop/loop/..." without ever terminating
+        // on its own.
+        val root = File(tempDir.toFile(), "root").apply { mkdirs() }
+        val sub = File(root, "sub").apply { mkdirs() }
+        File(sub, "real.txt").writeText("hi")
+        val loop = File(sub, "loop")
+        createJunction(loop.toPath(), sub.toPath())
+
+        assertTimeoutPreemptively(Duration.ofSeconds(20)) {
+            indexAndOpen(root, tempDir) { searcher ->
+                val realFileHits = searcher.search(TermQuery(Term("path", File(sub, "real.txt").absolutePath)), 1)
+                assertFalse(realFileHits.totalHits == 0L, "The real file next to the junction should still be indexed")
+
+                val junctionHits = searcher.search(TermQuery(Term("path", loop.absolutePath)), 1)
+                assertFalse(junctionHits.totalHits == 0L, "The junction itself should stay findable by name")
+
+                val oneLevelIn = File(loop, "loop")
+                val recursedHits = searcher.search(TermQuery(Term("path", oneLevelIn.absolutePath)), 1)
+                assertEquals(0L, recursedHits.totalHits, "The walk must not follow the junction back into itself")
+            }
         }
     }
 

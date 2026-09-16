@@ -63,14 +63,34 @@ private const val USN_CHECKPOINTS_FILE_NAME = "usn_checkpoints.properties"
  * before that upgrade, since normal startup only rebuilds when there's no index yet. Bumped again
  * when [DBManager.includeSystemFolders] defaulted to true, so upgrading users actually get
  * Program Files/Windows content the first time, instead of it silently staying excluded until
- * they happen to trigger a rebuild some other way.
+ * they happen to trigger a rebuild some other way. Bumped once more when the walk started
+ * skipping reparse points (NTFS junctions/mount points) instead of following them - real,
+ * self-referential ones exist by default on every Windows install (see
+ * [BasicFileAttributes.isReparsePointDirectory]'s doc) and, unguarded, sent the walk into a
+ * massive duplicate-indexing blowup once Program Files/Windows made it likely to hit one.
  */
-internal const val INDEX_SCHEMA_VERSION = 4
+internal const val INDEX_SCHEMA_VERSION = 5
 
 /** Bundles a document's two timestamp fields so [DBManager.addToIndex] stays under the parameter-count limit. */
 private data class FileTimestamps(val modified: Long, val created: Long)
 
 private fun BasicFileAttributes.timestamps() = FileTimestamps(lastModifiedTime().toMillis(), creationTime().toMillis())
+
+/**
+ * True for an NTFS junction/mount point - [LinkOption.NOFOLLOW_LINKS] does nothing to guard
+ * against these, since Java doesn't classify them as symbolic links at all ([isSymbolicLink]
+ * stays false); [isOther] is the actual signal Windows uses for a reparse point that isn't a
+ * symlink. Real, confirmed examples that exist on an ordinary Windows install include several
+ * *self-referential* junctions - e.g. "C:\ProgramData\Application Data" points back to
+ * "C:\ProgramData" itself, and every user profile has "AppData\Local\Application Data" pointing
+ * back to "AppData\Local". A plain recursive walk that doesn't skip these recurses into the same
+ * subtree under itself forever (or, without long-path support removing Windows' ~260-char MAX_PATH
+ * limit, until path length errors finally stop it - but only after enormous wasted duplicate work).
+ * The walk still indexes the junction path itself as a zero-size, non-recursed leaf so it stays
+ * findable by name, matching how Explorer shows it as an openable folder without silently
+ * mirroring its target's entire contents a second time under it.
+ */
+private fun BasicFileAttributes.isReparsePointDirectory(): Boolean = isDirectory && isOther
 
 /**
  * Builds and maintains the Lucene index of the local filesystem.
@@ -314,27 +334,8 @@ class DBManager(
                 return 0L
             }
 
-            var ownFilesSize = 0L
             val subDirectoryTasks = mutableListOf<IndexDirectoryTask>()
-
-            for (entry in entries) {
-                val attrs = try {
-                    Files.readAttributes(entry, BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
-                } catch (e: AccessDeniedException) {
-                    skippedPaths.add("File: $entry (Access Denied: ${e.message})")
-                    continue
-                } catch (e: IOException) {
-                    skippedPaths.add("Failed to access: $entry (${e.message})")
-                    continue
-                }
-
-                if (attrs.isDirectory) {
-                    subDirectoryTasks.add(IndexDirectoryTask(entry, indexWriter).also { it.fork() })
-                } else {
-                    addToIndex(entry, indexWriter, isFile = true, size = attrs.size(), timestamps = attrs.timestamps())
-                    ownFilesSize += attrs.size()
-                }
-            }
+            val ownFilesSize = entries.sumOf { entry -> processEntry(entry, subDirectoryTasks) }
 
             val subtreeSize = ownFilesSize + subDirectoryTasks.sumOf { it.join() }
             addToIndex(
@@ -342,6 +343,38 @@ class DBManager(
                 size = subtreeSize, timestamps = directoryTimestampsOrZero(directory),
             )
             return subtreeSize
+        }
+
+        /**
+         * Indexes one directory entry, forking a subtask for a real subdirectory; returns its
+         * own file size (0 for a directory/reparse point, or an entry that couldn't be read).
+         */
+        private fun processEntry(entry: Path, subDirectoryTasks: MutableList<IndexDirectoryTask>): Long {
+            val attrs = try {
+                Files.readAttributes(entry, BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
+            } catch (e: AccessDeniedException) {
+                skippedPaths.add("File: $entry (Access Denied: ${e.message})")
+                null
+            } catch (e: IOException) {
+                skippedPaths.add("Failed to access: $entry (${e.message})")
+                null
+            }
+
+            return when {
+                attrs == null -> 0L
+                attrs.isReparsePointDirectory() -> {
+                    addToIndex(entry, indexWriter, isFile = false, size = 0L, timestamps = attrs.timestamps())
+                    0L
+                }
+                attrs.isDirectory -> {
+                    subDirectoryTasks.add(IndexDirectoryTask(entry, indexWriter).also { it.fork() })
+                    0L
+                }
+                else -> {
+                    addToIndex(entry, indexWriter, isFile = true, size = attrs.size(), timestamps = attrs.timestamps())
+                    attrs.size()
+                }
+            }
         }
     }
 
@@ -800,7 +833,11 @@ class DBManager(
                 // of their own to indicate their pre-existing content.
                 if (kind == StandardWatchEventKinds.ENTRY_CREATE) {
                     currentWriter.deleteDocuments(Term("path", path.toString()))
-                    indexNewDirectory(path, currentWriter)
+                    if (attrs.isReparsePointDirectory()) {
+                        addToIndex(path, currentWriter, isFile = false, size = 0L, timestamps = attrs.timestamps())
+                    } else {
+                        indexNewDirectory(path, currentWriter)
+                    }
                 }
             } else {
                 currentWriter.deleteDocuments(Term("path", path.toString()))
@@ -826,6 +863,10 @@ class DBManager(
                 val attrs = readAttributesOrNull(entry)
                 when {
                     attrs == null -> 0L
+                    attrs.isReparsePointDirectory() -> {
+                        addToIndex(entry, writer, isFile = false, size = 0L, timestamps = attrs.timestamps())
+                        0L
+                    }
                     attrs.isDirectory -> indexNewDirectory(entry, writer)
                     else -> attrs.size().also {
                         addToIndex(entry, writer, isFile = true, size = it, timestamps = attrs.timestamps())
