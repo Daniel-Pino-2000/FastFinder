@@ -13,7 +13,7 @@ import androidx.compose.ui.res.loadImageBitmap
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Window
-import androidx.compose.ui.window.WindowPlacement
+import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import kotlinx.coroutines.Dispatchers
@@ -167,6 +167,9 @@ private fun ApplicationScope.runApp(args: Array<String>) {
         }
     }
 
+    // maximumWindowBounds is already taskbar-excluded (unlike a screen device's raw bounds) and,
+    // empirically verified against the actual rendered window, lines up 1:1 with the units
+    // WindowState's width/height/position take - no further density conversion needed here.
     val screenBounds = remember { GraphicsEnvironment.getLocalGraphicsEnvironment().maximumWindowBounds }
     // Adapts to the current screen rather than a flat constant: normally the structural minimum
     // the layout needs, but never forced larger than the screen itself has room for - see
@@ -177,13 +180,31 @@ private fun ApplicationScope.runApp(args: Array<String>) {
     val minHeight = remember(screenBounds) {
         STRUCTURAL_MIN_HEIGHT.coerceAtMost(screenBounds.height).coerceAtLeast(ABSOLUTE_FLOOR_HEIGHT)
     }
+    val windowWidth = resolveWindowDimension(
+        initialPreferences.windowWidth, minWidth, screenBounds.width, DEFAULT_WINDOW_WIDTH_FRACTION,
+    )
+    val windowHeight = resolveWindowDimension(
+        initialPreferences.windowHeight, minHeight, screenBounds.height, DEFAULT_WINDOW_HEIGHT_FRACTION,
+    )
+    // Explicit, not WindowPosition.PlatformDefault (the implicit default from omitting `position`
+    // entirely): the platform's own placement picks an arbitrary top-left offset with no regard
+    // for the taskbar at all, and on a display where the window's height already claims the
+    // *entire* taskbar-excluded work area (the common case - see STRUCTURAL_MIN_HEIGHT's doc),
+    // literally any nonzero offset the platform picks pushes the bottom edge past the taskbar
+    // while leaving a matching gap at the top - which is exactly the "goes under the taskbar, but
+    // there's also a gap above it" bug this fixes. Centering within [screenBounds] (already
+    // taskbar-excluded, unlike a screen device's raw bounds) instead guarantees the window always
+    // lands fully inside the usable area, with any leftover space split evenly on both sides.
+    val windowPosition = remember(screenBounds, windowWidth, windowHeight) {
+        WindowPosition(
+            (screenBounds.x + (screenBounds.width - windowWidth) / 2).dp,
+            (screenBounds.y + (screenBounds.height - windowHeight) / 2).dp,
+        )
+    }
     val windowState = rememberWindowState(
-        width = resolveWindowDimension(
-            initialPreferences.windowWidth, minWidth, screenBounds.width, DEFAULT_WINDOW_WIDTH_FRACTION,
-        ).dp,
-        height = resolveWindowDimension(
-            initialPreferences.windowHeight, minHeight, screenBounds.height, DEFAULT_WINDOW_HEIGHT_FRACTION,
-        ).dp,
+        position = windowPosition,
+        width = windowWidth.dp,
+        height = windowHeight.dp,
     )
 
     LaunchedEffect(dbManager) {
@@ -218,19 +239,6 @@ private fun ApplicationScope.runApp(args: Array<String>) {
         icon = windowIcon,
     ) {
         window.minimumSize = Dimension(minWidth, minHeight)
-
-        // AWT's native maximize can size a per-monitor-DPI-aware window a little short of the
-        // true taskbar-excluded work area on a scaled display (a known class of JDK/Windows
-        // interaction) - the window reports itself as fully maximized, but a visible sliver of
-        // desktop remains between its bottom edge and the taskbar. Re-applying the actual work
-        // area's bounds once placement flips to Maximized closes that gap; harmless once the
-        // bounds already happen to match.
-        LaunchedEffect(windowState.placement) {
-            if (windowState.placement == WindowPlacement.Maximized) {
-                window.bounds = GraphicsEnvironment.getLocalGraphicsEnvironment().maximumWindowBounds
-            }
-        }
-
         FastFinderApp(
             dbManager = dbManager,
             fastSync = FastSyncState(

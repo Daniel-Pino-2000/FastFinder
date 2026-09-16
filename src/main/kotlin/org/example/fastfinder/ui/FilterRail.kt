@@ -1,8 +1,5 @@
 package org.example.fastfinder.ui
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.TooltipArea
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -19,7 +16,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,7 +24,6 @@ import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.DropdownMenu
 import androidx.compose.material.DropdownMenuItem
 import androidx.compose.material.Icon
-import androidx.compose.material.Surface
 import androidx.compose.material.Switch
 import androidx.compose.material.SwitchDefaults
 import androidx.compose.material.Text
@@ -67,6 +62,8 @@ private val typeFilterOptions: List<SearchFilter> =
 fun FilterRail(
     searchMode: SearchMode,
     onSearchModeChange: (SearchMode) -> Unit,
+    exactMatch: Boolean,
+    onExactMatchChange: (Boolean) -> Unit,
     resultFilter: SearchFilter,
     onResultFilterChange: (SearchFilter) -> Unit,
     sizeFilter: SizeFilter,
@@ -108,6 +105,8 @@ fun FilterRail(
             RailSection(title = "Show") {
                 ShowSegmentedControl(searchMode, onSearchModeChange)
             }
+
+            ExactMatchRow(exactMatch, onExactMatchChange)
 
             RailSection(title = "Type") {
                 RailDropdown(
@@ -189,43 +188,6 @@ fun FilterRail(
         VerticalScrollbar(
             adapter = rememberScrollbarAdapter(scrollState),
             modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = 2.dp),
-        )
-    }
-}
-
-/**
- * A small info glyph that reveals [text] as a hover tooltip - used in place of an always-visible
- * caption line under a setting's row, so a setting that needs explaining doesn't cost permanent
- * vertical space for everyone who already knows what it does; the explanation is still one hover
- * away, matching how VS Code/JetBrains settings surface this kind of detail.
- */
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun InfoTooltip(text: String) {
-    val appColors = LocalAppColors.current
-    TooltipArea(
-        tooltip = {
-            Surface(
-                shape = RoundedCornerShape(6.dp),
-                color = appColors.surface,
-                border = BorderStroke(1.dp, appColors.border),
-                elevation = 4.dp,
-            ) {
-                Text(
-                    text = text,
-                    color = appColors.textSecondary,
-                    fontSize = 11.sp,
-                    lineHeight = 15.sp,
-                    modifier = Modifier.widthIn(max = 220.dp).padding(8.dp),
-                )
-            }
-        },
-    ) {
-        Icon(
-            AppTheme.infoIcon,
-            contentDescription = text,
-            tint = appColors.textTertiary,
-            modifier = Modifier.size(14.dp),
         )
     }
 }
@@ -382,6 +344,43 @@ private fun RailActionButton(icon: ImageVector, label: String, onClick: () -> Un
 }
 
 /**
+ * "Match exactly as typed" - a result's name must equal the query, not merely contain it (the
+ * default). Mirrors the same opt-in exact/whole-word toggle every comparable search tool
+ * (Everything, Listary) offers alongside its default substring search. Placed right under "Show"
+ * since both control *what counts as a match*, ahead of the Type/Size filters that narrow down
+ * matches after the fact.
+ */
+@Composable
+private fun ExactMatchRow(exactMatch: Boolean, onExactMatchChange: (Boolean) -> Unit) {
+    val appColors = LocalAppColors.current
+    RailSection(title = "Match") {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "Exact Match",
+                color = appColors.textPrimary,
+                fontSize = 12.5.sp,
+                modifier = Modifier.weight(1f),
+            )
+            Switch(
+                checked = exactMatch,
+                onCheckedChange = onExactMatchChange,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = appColors.accent,
+                    checkedTrackColor = appColors.accent,
+                ),
+            )
+        }
+        Text(
+            text = "Only shows items whose name matches the query exactly.",
+            color = appColors.textTertiary,
+            fontSize = 10.5.sp,
+            lineHeight = 14.sp,
+            modifier = Modifier.padding(top = 6.dp, start = 2.dp, end = 2.dp),
+        )
+    }
+}
+
+/**
  * Whether Program Files/Windows are included in the whole-drive index - on by default (see
  * [org.example.fastfinder.util.AppPreferences.includeSystemFolders]'s doc). Toggling this
  * immediately kicks off a full rebuild (the same one "Update Database" triggers) so the change is
@@ -398,11 +397,6 @@ private fun IndexScopeRow(includeSystemFolders: Boolean, onIncludeSystemFoldersC
                 fontSize = 12.5.sp,
                 modifier = Modifier.weight(1f),
             )
-            InfoTooltip(
-                "Rebuilds the index now. Recycle Bin and System Volume Information are " +
-                    "never indexed either way.",
-            )
-            Spacer(modifier = Modifier.width(8.dp))
             Switch(
                 checked = includeSystemFolders,
                 onCheckedChange = onIncludeSystemFoldersChange,
@@ -412,6 +406,14 @@ private fun IndexScopeRow(includeSystemFolders: Boolean, onIncludeSystemFoldersC
                 ),
             )
         }
+        Text(
+            text = "Rebuilds the index now. Recycle Bin and System Volume Information are " +
+                "never indexed either way.",
+            color = appColors.textTertiary,
+            fontSize = 10.5.sp,
+            lineHeight = 14.sp,
+            modifier = Modifier.padding(top = 6.dp, start = 2.dp, end = 2.dp),
+        )
     }
 }
 
@@ -424,7 +426,7 @@ private fun IndexScopeRow(includeSystemFolders: Boolean, onIncludeSystemFoldersC
  * the user will ever see, in direct response to something they clicked. Turning it off never
  * restarts anything - a running process can't give back privileges it already has, so this only
  * ever changes whether the *next* launch auto-elevates; [FastSyncState.isElevated] (this
- * session's actual, unchangeable state) is reflected separately, in the info tooltip, rather
+ * session's actual, unchangeable state) is reflected separately, in the caption below, rather
  * than by fighting the switch back on. A plain [Switch] rather than [RailActionButton] here since
  * this genuinely is an on/off setting, not a one-shot action like the buttons below it.
  */
@@ -439,17 +441,6 @@ private fun FastSyncRow(fastSync: FastSyncState) {
                 fontSize = 12.5.sp,
                 modifier = Modifier.weight(1f),
             )
-            InfoTooltip(
-                when {
-                    fastSync.isAwaitingElevation -> "Waiting for the Administrator prompt…"
-                    fastSync.isElevated && !fastSync.fastSyncEnabled -> "Off next launch - this " +
-                        "session keeps its current Administrator access until you restart FastFinder."
-                    fastSync.fastSyncEnabled -> "On - catching up on changes instantly instead of a full rescan."
-                    else -> "Requires Administrator access. Instantly catches up on changes made " +
-                        "while FastFinder was closed, instead of a full rescan."
-                },
-            )
-            Spacer(modifier = Modifier.width(8.dp))
             if (fastSync.isAwaitingElevation) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(16.dp),
@@ -472,5 +463,19 @@ private fun FastSyncRow(fastSync: FastSyncState) {
                 )
             }
         }
+        Text(
+            text = when {
+                fastSync.isAwaitingElevation -> "Waiting for the Administrator prompt…"
+                fastSync.isElevated && !fastSync.fastSyncEnabled -> "Off next launch - this " +
+                    "session keeps its current Administrator access until you restart FastFinder."
+                fastSync.fastSyncEnabled -> "On - catching up on changes instantly instead of a full rescan."
+                else -> "Requires Administrator access. Instantly catches up on changes made " +
+                    "while FastFinder was closed, instead of a full rescan."
+            },
+            color = appColors.textTertiary,
+            fontSize = 10.5.sp,
+            lineHeight = 14.sp,
+            modifier = Modifier.padding(top = 6.dp, start = 2.dp, end = 2.dp),
+        )
     }
 }
