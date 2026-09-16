@@ -3,6 +3,7 @@ package org.example.fastfinder.ui.theme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -28,6 +29,7 @@ object AppTheme {
     val sortDirectionUpIcon: ImageVector = Icons.Default.ArrowUpward
     val sortDirectionDownIcon: ImageVector = Icons.Default.ArrowDownward
     val chevronIcon: ImageVector = Icons.Default.ArrowDropDown
+    val infoIcon: ImageVector = Icons.Outlined.Info
 }
 
 /**

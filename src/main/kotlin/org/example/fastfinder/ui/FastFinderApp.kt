@@ -161,8 +161,6 @@ fun FastFinderApp(dbManager: DBManager, fastSync: FastSyncState) {
                 FilterRail(
                     searchMode = searchMode,
                     onSearchModeChange = { searchMode = it },
-                    exactMatch = exactMatch,
-                    onExactMatchChange = { exactMatch = it },
                     resultFilter = resultFilter,
                     onResultFilterChange = { resultFilter = it },
                     sizeFilter = sizeFilter,
@@ -207,6 +205,8 @@ fun FastFinderApp(dbManager: DBManager, fastSync: FastSyncState) {
                         searchQuery = searchQuery,
                         onSearchQueryChange = { searchQuery = it },
                         onSearch = { runSearch(activeCustomSearchDirectory) },
+                        exactMatch = exactMatch,
+                        onExactMatchChange = { exactMatch = it },
                         focusRequester = searchBarFocusRequester,
                         modifier = Modifier.padding(12.dp),
                     )
