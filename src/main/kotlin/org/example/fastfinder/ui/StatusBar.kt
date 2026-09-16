@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.example.fastfinder.ui.theme.LocalAppColors
+import org.example.fastfinder.util.AppVersion
 
 /** The main pane's bottom status row - result count on the left, indexing state on the right. */
 @Composable
@@ -71,5 +72,13 @@ fun StatusBar(
             Spacer(modifier = Modifier.width(5.dp))
             Text(text = "Index up to date", color = appColors.accent, fontSize = 11.5.sp, lineHeight = 11.5.sp)
         }
+
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(
+            text = "v${AppVersion.current}",
+            color = appColors.textTertiary,
+            fontSize = 11.sp,
+            lineHeight = 11.sp,
+        )
     }
 }

@@ -75,6 +75,15 @@ tasks.test {
     useJUnitPlatform()
 }
 
+// Stamps the project version (the single source of truth also used by packageVersion below) into
+// the packaged version.properties resource, so the UI can display it (see util/AppVersion.kt)
+// without a second hardcoded literal to drift out of sync.
+tasks.named<Copy>("processResources") {
+    filesMatching("version.properties") {
+        expand("version" to project.version)
+    }
+}
+
 detekt {
     buildUponDefaultConfig = true
     baseline = file("config/detekt/baseline.xml")
