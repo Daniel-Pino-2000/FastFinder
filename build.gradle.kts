@@ -80,6 +80,21 @@ detekt {
     baseline = file("config/detekt/baseline.xml")
 }
 
+// Exposes `version` above to the running app (the status bar displays it) without duplicating it
+// as a second hardcoded string. A generated resource, not the JAR manifest's Implementation-
+// Version: the manifest is only present in the packaged jar/installer, so reading it that way
+// would show nothing while iterating with `./gradlew run` - a plain resource works identically
+// in both.
+val generateVersionResource = tasks.register("generateVersionResource") {
+    val outputDir = layout.buildDirectory.dir("generated/resources/version")
+    outputs.dir(outputDir)
+    doLast {
+        outputDir.get().asFile.apply { mkdirs() }.resolve("version.txt").writeText(project.version.toString())
+    }
+}
+
+sourceSets["main"].resources.srcDir(generateVersionResource)
+
 tasks.register<JavaExec>("benchmarkIndexing") {
     group = "verification"
     description = "One-off benchmark comparing single-threaded vs fork-join parallel indexing over a synthetic file tree."

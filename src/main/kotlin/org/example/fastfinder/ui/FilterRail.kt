@@ -62,6 +62,8 @@ private val typeFilterOptions: List<SearchFilter> =
 fun FilterRail(
     searchMode: SearchMode,
     onSearchModeChange: (SearchMode) -> Unit,
+    exactMatch: Boolean,
+    onExactMatchChange: (Boolean) -> Unit,
     resultFilter: SearchFilter,
     onResultFilterChange: (SearchFilter) -> Unit,
     sizeFilter: SizeFilter,
@@ -103,6 +105,8 @@ fun FilterRail(
             RailSection(title = "Show") {
                 ShowSegmentedControl(searchMode, onSearchModeChange)
             }
+
+            ExactMatchRow(exactMatch, onExactMatchChange)
 
             RailSection(title = "Type") {
                 RailDropdown(
@@ -335,6 +339,43 @@ private fun RailActionButton(icon: ImageVector, label: String, onClick: () -> Un
             fontSize = 12.5.sp,
             lineHeight = 12.5.sp,
             fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+/**
+ * "Match exactly as typed" - a result's name must equal the query, not merely contain it (the
+ * default). Mirrors the same opt-in exact/whole-word toggle every comparable search tool
+ * (Everything, Listary) offers alongside its default substring search. Placed right under "Show"
+ * since both control *what counts as a match*, ahead of the Type/Size filters that narrow down
+ * matches after the fact.
+ */
+@Composable
+private fun ExactMatchRow(exactMatch: Boolean, onExactMatchChange: (Boolean) -> Unit) {
+    val appColors = LocalAppColors.current
+    RailSection(title = "Match") {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "Exact Match",
+                color = appColors.textPrimary,
+                fontSize = 12.5.sp,
+                modifier = Modifier.weight(1f),
+            )
+            Switch(
+                checked = exactMatch,
+                onCheckedChange = onExactMatchChange,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = appColors.accent,
+                    checkedTrackColor = appColors.accent,
+                ),
+            )
+        }
+        Text(
+            text = "Only shows items whose name matches the query exactly.",
+            color = appColors.textTertiary,
+            fontSize = 10.5.sp,
+            lineHeight = 14.sp,
+            modifier = Modifier.padding(top = 6.dp, start = 2.dp, end = 2.dp),
         )
     }
 }

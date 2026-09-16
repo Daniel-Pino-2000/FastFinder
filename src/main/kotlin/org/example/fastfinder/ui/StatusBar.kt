@@ -19,13 +19,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.example.fastfinder.ui.theme.LocalAppColors
+import org.example.fastfinder.util.appVersion
 
-/** The main pane's bottom status row - result count on the left, indexing state on the right. */
+/**
+ * The main pane's bottom status row - result count on the left, indexing state and the app's own
+ * version on the right, in that order (version last, since it's the least actionable/urgent of
+ * the three - matches version numbers typically sitting at the very edge of a status bar, e.g.
+ * VS Code's, rather than competing for attention nearer the center).
+ */
 @Composable
 fun StatusBar(
     isIndexing: Boolean,
     indexedCount: Int,
     resultCount: Int,
+    version: String? = appVersion,
     modifier: Modifier = Modifier,
 ) {
     val appColors = LocalAppColors.current
@@ -70,6 +77,13 @@ fun StatusBar(
             )
             Spacer(modifier = Modifier.width(5.dp))
             Text(text = "Index up to date", color = appColors.accent, fontSize = 11.5.sp, lineHeight = 11.5.sp)
+        }
+
+        // Muted and last in reading order - identifying info for a bug report, not something
+        // that needs to compete with the indexing status for attention on every glance down here.
+        version?.let {
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(text = "v$it", color = appColors.textTertiary, fontSize = 11.sp, lineHeight = 11.sp)
         }
     }
 }
