@@ -41,15 +41,18 @@ private const val WINDOW_SIZE_SAVE_DEBOUNCE_MS = 500L
 // exact height needed) to clear the rail's natural content - every filter section, the sync row,
 // and all three action buttons - with room to spare, so scrolling should rarely if ever actually
 // be needed in normal use.
+//
+// A genuine hard floor, not just a starting point that then adapts down to fit a smaller screen:
+// an earlier version clamped this down via `.coerceAtMost(screenBounds.width/height)` on the
+// theory that the window should never be forced larger than the screen itself, but that let the
+// window (and therefore this exact table/scrollbar layout) shrink well past the size it was
+// actually designed and tested for on any screen smaller than ~780x830, which is exactly where
+// the results table's header, rows, and both scrollbars would run out of room and stop rendering
+// correctly. Trading "never larger than the screen" for "always usable" is the right call here -
+// a window very slightly taller than a small screen's work area is a minor, recoverable
+// inconvenience (move/maximize it), unlike a scrollbar that silently stops appearing.
 private const val STRUCTURAL_MIN_WIDTH = 780
 private const val STRUCTURAL_MIN_HEIGHT = 830
-
-// A hard floor below STRUCTURAL_MIN_WIDTH/HEIGHT, only reached on a screen too small to offer the
-// structural minimum at all (e.g. a small secondary/virtual display) - the window still needs
-// *some* usable size rather than being forced larger than the screen itself, even though content
-// will then need scrolling to fit.
-private const val ABSOLUTE_FLOOR_WIDTH = 480
-private const val ABSOLUTE_FLOOR_HEIGHT = 360
 
 // A first-ever launch sizes the window as a fraction of the current screen instead of a flat
 // pixel default - a flat default only ever gets clamped *down* to fit a small screen (never
@@ -177,21 +180,12 @@ private fun ApplicationScope.runApp(args: Array<String>) {
     }
 
     val screenBounds = remember { GraphicsEnvironment.getLocalGraphicsEnvironment().maximumWindowBounds }
-    // Adapts to the current screen rather than a flat constant: normally the structural minimum
-    // the layout needs, but never forced larger than the screen itself has room for - see
-    // STRUCTURAL_MIN_WIDTH/HEIGHT's doc.
-    val minWidth = remember(screenBounds) {
-        STRUCTURAL_MIN_WIDTH.coerceAtMost(screenBounds.width).coerceAtLeast(ABSOLUTE_FLOOR_WIDTH)
-    }
-    val minHeight = remember(screenBounds) {
-        STRUCTURAL_MIN_HEIGHT.coerceAtMost(screenBounds.height).coerceAtLeast(ABSOLUTE_FLOOR_HEIGHT)
-    }
     val windowState = rememberWindowState(
         width = resolveWindowDimension(
-            initialPreferences.windowWidth, minWidth, screenBounds.width, DEFAULT_WINDOW_WIDTH_FRACTION,
+            initialPreferences.windowWidth, STRUCTURAL_MIN_WIDTH, screenBounds.width, DEFAULT_WINDOW_WIDTH_FRACTION,
         ).dp,
         height = resolveWindowDimension(
-            initialPreferences.windowHeight, minHeight, screenBounds.height, DEFAULT_WINDOW_HEIGHT_FRACTION,
+            initialPreferences.windowHeight, STRUCTURAL_MIN_HEIGHT, screenBounds.height, DEFAULT_WINDOW_HEIGHT_FRACTION,
         ).dp,
     )
 
@@ -226,7 +220,7 @@ private fun ApplicationScope.runApp(args: Array<String>) {
         state = windowState,
         icon = windowIcon,
     ) {
-        window.minimumSize = Dimension(minWidth, minHeight)
+        window.minimumSize = Dimension(STRUCTURAL_MIN_WIDTH, STRUCTURAL_MIN_HEIGHT)
         FastFinderApp(
             dbManager = dbManager,
             fastSync = FastSyncState(
