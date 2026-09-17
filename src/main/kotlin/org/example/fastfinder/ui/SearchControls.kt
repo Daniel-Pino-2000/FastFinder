@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -112,10 +113,13 @@ private fun ExactMatchToggle(exactMatch: Boolean, onExactMatchChange: (Boolean) 
             colors = CheckboxDefaults.colors(checkedColor = appColors.accent),
             // Material's Checkbox defaults to a 40dp touch target well past its ~20dp glyph, which
             // left a lopsided gap between the box and "Exact match" - as if the two weren't part of
-            // the same control. Shrinking it to the glyph's own size lines its edge up with the
-            // text that follows, the same tight spacing [ShowSegmentedControl] and every other
-            // label-plus-control pairing in the rail already uses.
-            modifier = Modifier.size(20.dp),
+            // the same control. Shrinking it to a bit past the glyph's own size lines its edge up
+            // with the text that follows, the same tight spacing [ShowSegmentedControl] and every
+            // other label-plus-control pairing in the rail already uses. Text's line box carries
+            // more leading above the glyphs than below (a Skia text-metrics quirk, not fixable by
+            // lineHeight alone - see StatusBar.kt), so a box-centered checkbox reads as sitting too
+            // high next to it - nudge down slightly to land on the text's visual center.
+            modifier = Modifier.size(16.dp).offset(y = 1.dp),
         )
         Spacer(modifier = Modifier.width(6.dp))
         Text(
