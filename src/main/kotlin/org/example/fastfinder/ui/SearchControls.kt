@@ -4,8 +4,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Checkbox
 import androidx.compose.material.CheckboxDefaults
@@ -97,7 +100,7 @@ private fun ExactMatchToggle(exactMatch: Boolean, onExactMatchChange: (Boolean) 
                 shape = RoundedCornerShape(8.dp),
             )
             .clickable { onExactMatchChange(!exactMatch) }
-            .padding(start = 6.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
+            .padding(start = 10.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
     ) {
         Checkbox(
             checked = exactMatch,
@@ -107,7 +110,14 @@ private fun ExactMatchToggle(exactMatch: Boolean, onExactMatchChange: (Boolean) 
             // cancel it back out on every click.
             onCheckedChange = null,
             colors = CheckboxDefaults.colors(checkedColor = appColors.accent),
+            // Material's Checkbox defaults to a 40dp touch target well past its ~20dp glyph, which
+            // left a lopsided gap between the box and "Exact match" - as if the two weren't part of
+            // the same control. Shrinking it to the glyph's own size lines its edge up with the
+            // text that follows, the same tight spacing [ShowSegmentedControl] and every other
+            // label-plus-control pairing in the rail already uses.
+            modifier = Modifier.size(20.dp),
         )
+        Spacer(modifier = Modifier.width(6.dp))
         Text(
             text = "Exact match",
             color = if (exactMatch) appColors.accent else appColors.textSecondary,

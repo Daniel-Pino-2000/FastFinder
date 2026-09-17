@@ -18,7 +18,7 @@
     <ID>FunctionNaming:ResultItem.kt$@OptIn(ExperimentalComposeUiApi::class) @Composable private fun RowActionIcon(icon: ImageVector, contentDescription: String, visible: Boolean, onClick: () -&gt; Unit)</ID>
     <ID>FunctionNaming:ResultItem.kt$@OptIn(ExperimentalComposeUiApi::class, ExperimentalFoundationApi::class) @Composable fun ResultItem(item: SystemItem)</ID>
     <ID>FunctionNaming:ResultsList.kt$@Composable fun ResultsList( items: List&lt;SystemItem&gt;, searchMode: SearchMode, resultFilter: SearchFilter, sizeFilter: SizeFilter, sortBy: SortBy, sortAscending: Boolean, // Only relevant to the empty-state message below: whole-index search silently returns // nothing while the index isn't ready (see Search.searchIndex), which otherwise looks // identical to "no matches" - these let the empty state tell the two apart. Custom search // walks the filesystem directly and isn't affected, so this never applies while it's active. showIndexingNotice: Boolean = false, modifier: Modifier = Modifier, )</ID>
-    <ID>FunctionNaming:ResultsList.kt$@Composable private fun ColumnHeader()</ID>
+    <ID>FunctionNaming:ResultsList.kt$@Composable private fun ColumnHeader(modifier: Modifier = Modifier)</ID>
     <ID>FunctionNaming:ResultsList.kt$@Composable private fun HeaderLabel(text: String, modifier: Modifier)</ID>
     <ID>FunctionNaming:ResultsList.kt$@Composable private fun IndexingNotice(modifier: Modifier = Modifier)</ID>
     <ID>FunctionNaming:SearchControls.kt$@Composable fun SearchBar( searchQuery: String, onSearchQueryChange: (String) -&gt; Unit, onSearch: () -&gt; Unit, exactMatch: Boolean, onExactMatchChange: (Boolean) -&gt; Unit, modifier: Modifier = Modifier, focusRequester: FocusRequester? = null, )</ID>
@@ -33,7 +33,6 @@
     <ID>LongParameterList:Search.kt$Search$( query: String, customSearchDirectory: File? = null, searchMode: SearchMode = SearchMode.ALL, resultFilter: SearchFilter = SearchFilter.ALL, sizeFilter: SizeFilter = SizeFilter.ANY, // Off by default (substring match, the common case): the name/path must equal the query // exactly (case-insensitively) rather than merely contain it. exactMatch: Boolean = false, )</ID>
     <ID>LongParameterList:Search.kt$Search$( query: String, targetDirectory: File, searchMode: SearchMode, resultFilter: SearchFilter, sizeFilter: SizeFilter, exactMatch: Boolean, )</ID>
     <ID>LongParameterList:SearchControls.kt$( searchQuery: String, onSearchQueryChange: (String) -&gt; Unit, onSearch: () -&gt; Unit, exactMatch: Boolean, onExactMatchChange: (Boolean) -&gt; Unit, modifier: Modifier = Modifier, focusRequester: FocusRequester? = null, )</ID>
-    <ID>LoopWithTooManyJumpStatements:DBManager.kt$DBManager.IndexDirectoryTask$for</ID>
     <ID>MagicNumber:DBManager.kt$DBManager$100</ID>
     <ID>MagicNumber:FastFinderApp.kt$250</ID>
     <ID>MagicNumber:FileTypeUtils.kt$1024</ID>
@@ -59,6 +58,7 @@
     <ID>MaxLineLength:FileTypeUtilsTest.kt$FileTypeUtilsTest$assertEquals(listOf("large.txt", "medium.txt", "small.txt"), names(items.sortedWith(systemItemComparator(SortBy.SIZE, ascending = false))))</ID>
     <ID>MaxLineLength:FileTypeUtilsTest.kt$FileTypeUtilsTest$assertEquals(listOf("small.txt", "medium.txt", "large.txt"), names(items.sortedWith(systemItemComparator(SortBy.SIZE, ascending = true))))</ID>
     <ID>MaxLineLength:ResultsList.kt$items.filter { it.isVisible(searchMode, resultFilter, sizeFilter) }.sortedWith(systemItemComparator(sortBy, sortAscending))</ID>
+    <ID>MaxLineLength:ResultsList.kt$val tableWidthModifier = if (needsHorizontalScroll) Modifier.width(MIN_TABLE_CONTENT_WIDTH) else Modifier.fillMaxWidth()</ID>
     <ID>MaxLineLength:Search.kt$Search$add(LongPoint.newRangeQuery("size", sizeFilter.minBytes, sizeFilter.maxBytes), BooleanClause.Occur.MUST)</ID>
     <ID>MaxLineLength:SearchTest.kt$SearchTest$/** Builds a real Lucene index (bypassing [DBManager.createOrUpdateIndex], which always walks real drives) so [Search]'s indexed-search query logic can be exercised directly. */</ID>
     <ID>MaxLineLength:SearchTest.kt$SearchTest$assertEquals(setOf("report.pdf", "report.png"), filesOnly.map { it.itemPath.substringAfterLast(File.separatorChar) }.toSet())</ID>
