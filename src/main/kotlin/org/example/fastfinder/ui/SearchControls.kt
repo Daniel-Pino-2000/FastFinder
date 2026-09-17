@@ -13,7 +13,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -73,18 +72,8 @@ fun SearchBar(
             singleLine = true,
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = appColors.textTertiary) },
             trailingIcon = { ClearSearchButton(searchQuery, onSearchQueryChange) },
-            // weight(1f, fill = false), not the usual fill = true (equivalent to fillMaxWidth() on
-            // a weighted slot): asking this specific OutlinedTextField to fill an exact/maximum-
-            // width constraint - via weight's default fill = true, or via a wrapping Box +
-            // fillMaxWidth() - is a real Compose/Material measurement bug that makes it misbehave
-            // badly enough that ExactMatchToggle beside it stops receiving any layout space at
-            // all, vanishing entirely (most visible on a narrow window) rather than just rendering
-            // oddly. fill = false only gives it an upper bound (so it still grows on a wider
-            // window) without forcing it to that exact width, which sidesteps the bug;
-            // defaultMinSize keeps it from shrinking to nothing once it's no longer forced wide.
             modifier = Modifier
-                .weight(1f, fill = false)
-                .defaultMinSize(minWidth = 320.dp)
+                .weight(1f)
                 .let { if (focusRequester != null) it.focusRequester(focusRequester) else it }
                 .onKeyEvent { event ->
                     if (event.type == KeyEventType.KeyUp && event.key == Key.Enter) {
@@ -107,9 +96,7 @@ fun SearchBar(
  * Styled as a bordered chip rather than a bare checkbox+label, matching the tinted "selected"
  * treatment [ShowSegmentedControl][org.example.fastfinder.ui.FilterRail] already uses elsewhere
  * in the app - checked state gets an accent-tinted background/border so it reads as "on" at a
- * glance, not just via the small checkbox glyph. See the search field's own modifier above for
- * why it's a plain, unweighted sibling here - the bug that could make it vanish entirely lives on
- * the *other* side of this Row.
+ * glance, not just via the small checkbox glyph.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable

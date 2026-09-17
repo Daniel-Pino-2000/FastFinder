@@ -60,6 +60,16 @@ private const val DEFAULT_WINDOW_WIDTH_FRACTION = 0.7
 private const val DEFAULT_WINDOW_HEIGHT_FRACTION = 0.75
 
 fun main(args: Array<String>) {
+    // Compose Desktop's default (auto-detected) Skia backend on Windows goes through ANGLE's
+    // OpenGL-to-D3D translation layer, which has known reliability gaps keeping the GPU
+    // backbuffer in sync with the native window during a live/interactive resize - manifesting as
+    // individual elements (whichever hadn't repainted into the not-yet-resized surface) briefly
+    // or persistently failing to appear until some later frame forces a full repaint. Forcing the
+    // native Direct3D backend instead - still GPU-accelerated, so this doesn't cost the animations
+    // elsewhere in the UI their smoothness - sidesteps that translation layer entirely. Must be set
+    // before any Skiko/Compose window is created, so this is the very first thing main() does.
+    System.setProperty("skiko.renderApi", "DIRECT3D")
+
     // Without this, Swing's dialogs (the folder picker, the elevation/error prompts) render with
     // whichever look-and-feel the launching JVM happens to default to - which differs by JDK
     // vendor/build (e.g. JetBrains Runtime vs. a plain OpenJDK build), so the same code can show
