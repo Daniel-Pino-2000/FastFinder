@@ -3,6 +3,7 @@ package org.example.fastfinder.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,13 +12,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.Checkbox
-import androidx.compose.material.CheckboxDefaults
 import androidx.compose.material.Icon
 import androidx.compose.material.OutlinedTextField
 import androidx.compose.material.Text
 import androidx.compose.material.TextFieldDefaults
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.Composable
@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -103,24 +104,35 @@ private fun ExactMatchToggle(exactMatch: Boolean, onExactMatchChange: (Boolean) 
             .clickable { onExactMatchChange(!exactMatch) }
             .padding(start = 10.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
     ) {
-        Checkbox(
-            checked = exactMatch,
-            // null, not onExactMatchChange: the enclosing Row is already clickable (so clicking
-            // the label toggles it too, not just the small checkbox glyph) - a Checkbox with its
-            // own onCheckedChange would fire a second, independent toggle on top of that one and
-            // cancel it back out on every click.
-            onCheckedChange = null,
-            colors = CheckboxDefaults.colors(checkedColor = appColors.accent),
-            // Material's Checkbox defaults to a 40dp touch target well past its ~20dp glyph, which
-            // left a lopsided gap between the box and "Exact match" - as if the two weren't part of
-            // the same control. Shrinking it to a bit past the glyph's own size lines its edge up
-            // with the text that follows, the same tight spacing [ShowSegmentedControl] and every
-            // other label-plus-control pairing in the rail already uses. Text's line box carries
-            // more leading above the glyphs than below (a Skia text-metrics quirk, not fixable by
-            // lineHeight alone - see StatusBar.kt), so a box-centered checkbox reads as sitting too
-            // high next to it - nudge down slightly to land on the text's visual center.
-            modifier = Modifier.size(16.dp).offset(y = 1.dp),
-        )
+        // A hand-drawn box instead of Material's Checkbox: that composable hardcodes its glyph to
+        // a fixed ~20dp via an internal requiredSize() that overrides whatever size the caller
+        // asks for, so it couldn't actually be shrunk this way - and its own internal padding
+        // fights any attempt to nudge it into alignment with the text next to it. Text's line box
+        // carries more leading above the glyph than below (a Skia text-metrics quirk, not fixable
+        // by lineHeight alone - see StatusBar.kt), so this is nudged down slightly to land on the
+        // text's true visual center rather than its own geometric center.
+        Box(
+            modifier = Modifier
+                .size(14.dp)
+                .offset(y = 2.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(if (exactMatch) appColors.accent else Color.Transparent)
+                .border(
+                    width = 1.5.dp,
+                    color = if (exactMatch) appColors.accent else appColors.textTertiary,
+                    shape = RoundedCornerShape(3.dp),
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (exactMatch) {
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = null,
+                    tint = appColors.onAccent,
+                    modifier = Modifier.size(10.dp),
+                )
+            }
+        }
         Spacer(modifier = Modifier.width(6.dp))
         Text(
             text = "Exact match",

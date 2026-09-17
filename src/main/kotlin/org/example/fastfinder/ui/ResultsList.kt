@@ -22,14 +22,9 @@ import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -98,27 +93,34 @@ fun ResultsList(
     Column(modifier = modifier) {
         BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
             // Below MIN_TABLE_CONTENT_WIDTH, the table stops flexing to fit and scrolls
-            // horizontally instead, at a fixed width - see that constant's doc. Header and rows
-            // share a single horizontalScroll wrapper (not two separate ones over the same
-            // ScrollState): a ScrollState's maxValue is derived from whichever scrollable content
-            // under it was measured most recently, so two independently-measured containers
-            // (the header's fixed-width Row vs. the LazyColumn, whose own measured content width
-            // is 0 with no rows composed) fight over it and the emptier one wins, pinning maxValue
-            // at 0 and hiding the scrollbar even though the header genuinely overflows.
+            // horizontally instead, at a fixed width - see that constant's doc. The header and the
+            // LazyColumn each get their own horizontalScroll sharing one ScrollState (so dragging
+            // either - or the scrollbar - keeps both in lockstep), but both also get `tableWidthModifier`
+            // applied *after* horizontalScroll in their own modifier chain, forcing a fixed,
+            // deterministic content width for the scroll calculation. That "after" ordering matters:
+            // an earlier version left the LazyColumn to size itself from its own items, which
+            // reported 0 width with no rows composed (e.g. an empty search) - two scrollables
+            // disagreeing about their content width fight over the shared ScrollState's maxValue,
+            // and the emptier one kept winning, pinning it at 0 and hiding the scrollbar even
+            // though the header genuinely overflowed.
             val needsHorizontalScroll = maxWidth < MIN_TABLE_CONTENT_WIDTH
             val horizontalScrollState = rememberScrollState()
             val tableWidthModifier = if (needsHorizontalScroll) Modifier.width(MIN_TABLE_CONTENT_WIDTH) else Modifier.fillMaxWidth()
-            val density = LocalDensity.current
-            var headerHeightPx by remember { mutableStateOf(0) }
 
-            Column(
-                modifier = Modifier.fillMaxSize().let {
-                    if (needsHorizontalScroll) it.horizontalScroll(horizontalScrollState) else it
-                },
-            ) {
-                ColumnHeader(modifier = tableWidthModifier.onSizeChanged { headerHeightPx = it.height })
+            Column(modifier = Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().let {
+                        if (needsHorizontalScroll) it.horizontalScroll(horizontalScrollState, enabled = false) else it
+                    },
+                ) {
+                    ColumnHeader(modifier = tableWidthModifier)
+                }
 
-                Box(modifier = Modifier.weight(1f).then(tableWidthModifier)) {
+                // Scoped to exactly the row area (not the header above it), so the vertical
+                // scrollbar below needs no manual offset math to avoid overlapping the header -
+                // unlike a header-height-derived padding, this can never be squeezed to zero on a
+                // short window and silently disappear.
+                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     if (showIndexingNotice && visibleItems.isEmpty()) {
                         IndexingNotice(modifier = Modifier.align(Alignment.Center))
                     }
@@ -126,26 +128,23 @@ fun ResultsList(
                     LazyColumn(
                         state = listState,
                         contentPadding = PaddingValues(vertical = 4.dp),
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier.fillMaxHeight().let {
+                            if (needsHorizontalScroll) it.horizontalScroll(horizontalScrollState) else it
+                        }.then(tableWidthModifier),
                     ) {
                         items(visibleItems, key = { it.itemPath }) { item -> ResultItem(item) }
                     }
+
+                    // Pinned to this Box's own right edge, not the LazyColumn's - the LazyColumn is
+                    // what scrolls horizontally above, this sibling never does, so it stays put
+                    // exactly where a "frozen scrollbar, scrolling columns" split like Explorer's
+                    // details view needs it regardless of horizontal scroll position.
+                    VerticalScrollbar(
+                        adapter = rememberScrollbarAdapter(listState),
+                        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = 2.dp),
+                    )
                 }
             }
-
-            // Pinned to the viewport's own right edge, outside the horizontally-scrolling content
-            // above - not the table's, which would otherwise carry it out of view sideways along
-            // with the columns. Same "frozen scrollbar, scrolling columns" split Explorer's
-            // details view uses. Offset below the header by its measured height so it only ever
-            // overlaps the row area, never the header itself.
-            VerticalScrollbar(
-                adapter = rememberScrollbarAdapter(listState),
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = with(density) { headerHeightPx.toDp() })
-                    .fillMaxHeight()
-                    .padding(end = 2.dp),
-            )
 
             if (needsHorizontalScroll) {
                 HorizontalScrollbar(
