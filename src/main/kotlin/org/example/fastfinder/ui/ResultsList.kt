@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -62,6 +63,9 @@ private val MIN_WEIGHTED_COLUMNS_WIDTH = 260.dp
 internal val MIN_TABLE_CONTENT_WIDTH = ROW_HORIZONTAL_PADDING + ICON_COLUMN_WIDTH + MIN_WEIGHTED_COLUMNS_WIDTH +
     SIZE_COLUMN_WIDTH + TYPE_COLUMN_WIDTH + MODIFIED_COLUMN_WIDTH + CREATED_COLUMN_WIDTH + ACTIONS_COLUMN_WIDTH
 
+/** Room for the header, a couple of rows, and the horizontal scrollbar - see its call site's doc. */
+private val MIN_TABLE_AREA_HEIGHT = 140.dp
+
 @Composable
 fun ResultsList(
     items: List<SystemItem>,
@@ -91,7 +95,13 @@ fun ResultsList(
     }
 
     Column(modifier = modifier) {
-        BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
+        // heightIn(min = ...), not just weight(1f): on a screen smaller than STRUCTURAL_MIN_HEIGHT
+        // (see Main.kt), the window's own enforced minimum shrinks to match it, and without a floor
+        // here this area's weighted share can be squeezed towards zero by the search bar/status bar
+        // around it - taking the header, every row, and both scrollbars down with it. This trades
+        // that (a silent, total collapse) for the window overflowing its own bottom edge instead,
+        // which is recoverable (resize taller, or scroll) rather than "the list vanished".
+        BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth().heightIn(min = MIN_TABLE_AREA_HEIGHT)) {
             // Below MIN_TABLE_CONTENT_WIDTH, the table stops flexing to fit and scrolls
             // horizontally instead, at a fixed width - see that constant's doc. The header and the
             // LazyColumn each get their own horizontalScroll sharing one ScrollState (so dragging
