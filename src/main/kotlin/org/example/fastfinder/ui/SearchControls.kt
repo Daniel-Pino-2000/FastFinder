@@ -142,11 +142,15 @@ private fun ExactMatchToggle(exactMatch: Boolean, onExactMatchChange: (Boolean) 
     ) {
         AnimatedCheckbox(checked = exactMatch, fill = boxFill, border = boxBorder, checkTint = appColors.onAccent)
         Spacer(modifier = Modifier.width(6.dp))
+        // Fixed weight, not state-dependent: SemiBold is wider than Normal, and since the search
+        // field next to this chip is weight(1f)'d against the remaining row space, swapping
+        // weights on toggle used to make the search field visibly resize. Checked state is
+        // already communicated by the chip's tinted background/border/text color.
         Text(
             text = "Exact match",
             color = labelColor,
             fontSize = 12.5.sp,
-            fontWeight = if (exactMatch) FontWeight.SemiBold else FontWeight.Normal,
+            fontWeight = FontWeight.Medium,
         )
     }
 }
@@ -169,7 +173,7 @@ private fun AnimatedCheckbox(checked: Boolean, fill: Color, border: Color, check
     Box(
         modifier = Modifier
             .size(14.dp)
-            .offset(y = 2.dp)
+            .offset(y = 3.dp)
             .clip(RoundedCornerShape(3.dp))
             .background(fill)
             .border(width = 1.5.dp, color = border, shape = RoundedCornerShape(3.dp)),
