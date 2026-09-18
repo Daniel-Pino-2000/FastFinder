@@ -37,10 +37,24 @@ jobs:
           $msi = Get-ChildItem -Path build/compose/binaries/main/msi -Filter *.msi | Select-Object -First 1
           "path=$($msi.FullName)" >> $env:GITHUB_OUTPUT
 
+      # A second copy under a version-independent name, so external links (e.g. the portfolio
+      # site's download button) can point at .../releases/latest/download/FastFinder-latest.msi
+      # once and never need updating on future releases - the versioned filename above is the
+      # one a user sees when browsing the release page, this one is only for stable linking.
+      - name: Copy MSI under a stable filename
+        id: msi_stable
+        shell: pwsh
+        run: |
+          $stablePath = Join-Path (Split-Path ${{ steps.msi.outputs.path }}) "FastFinder-latest.msi"
+          Copy-Item -Path "${{ steps.msi.outputs.path }}" -Destination $stablePath
+          "path=$stablePath" >> $env:GITHUB_OUTPUT
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ steps.msi.outputs.path }}
+          files: |
+            ${{ steps.msi.outputs.path }}
+            ${{ steps.msi_stable.outputs.path }}
           # The installer isn't code-signed, so Windows SmartScreen shows an "Unknown
           # publisher" warning on first run - expected without a paid signing certificate,
           # worth calling out on the release itself rather than leaving users to wonder.
