@@ -138,7 +138,12 @@ private fun ExactMatchToggle(exactMatch: Boolean, onExactMatchChange: (Boolean) 
             .onPointerEvent(PointerEventType.Enter) { isHovered = true }
             .onPointerEvent(PointerEventType.Exit) { isHovered = false }
             .clickable { onExactMatchChange(!exactMatch) }
-            .padding(start = 10.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
+            // Top/bottom padding is intentionally asymmetric, not a typo: the checkbox+label pair
+            // sits low within its own content box (Skia's line-box leading skews toward the top -
+            // see AnimatedCheckbox), so equal padding here left the pair visibly off-center in the
+            // chip. Shifting weight from top to bottom (keeping the 12dp total, so chip height is
+            // unchanged) pulls the pair back to the chip's true vertical center.
+            .padding(start = 10.dp, end = 12.dp, top = 3.dp, bottom = 9.dp),
     ) {
         AnimatedCheckbox(checked = exactMatch, fill = boxFill, border = boxBorder, checkTint = appColors.onAccent)
         Spacer(modifier = Modifier.width(6.dp))
